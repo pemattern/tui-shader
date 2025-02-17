@@ -1,7 +1,14 @@
 [package]
 name = "tui-shader"
-version = "0.0.0"
+version = "0.0.1"
 edition = "2021"
+categories = ["graphics", "rendering", "gui"]
+description = "A ratatui widget that renders a fragment shader in the terminal"
+homepage = "https://github.com/pemattern/tui-shader"
+repository = "https://github.com/pemattern/tui-shader"
+keywords = ["tui", "shader", "wgpu", "terminal", "graphics"]
+license = "MIT OR Apache-2.0"
+readme = "README.md"
 
 [dependencies]
 bytemuck = "1.21.0"
