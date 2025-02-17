@@ -23,7 +23,7 @@ pub struct WgpuContext {
 }
 
 impl WgpuContext {
-    pub fn new(path_to_fragment_shader: &str) -> Self {
+    pub fn new(path_to_fragment_shader: &str, entry_point: &str) -> Self {
         let instance = wgpu::Instance::default();
 
         let adapter = instance
@@ -117,7 +117,7 @@ impl WgpuContext {
             },
             fragment: Some(wgpu::FragmentState {
                 module: &fragment_shader,
-                entry_point: Some("main"),
+                entry_point: Some(entry_point),
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
                 targets: &[Some(wgpu::ColorTargetState {
                     format: wgpu::TextureFormat::Rgba8Unorm,

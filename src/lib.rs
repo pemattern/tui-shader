@@ -9,7 +9,7 @@ mod tests {
 
     #[test]
     fn all_magenta() {
-        let mut context = WgpuContext::new("src/shaders/default_fragment.wgsl");
+        let mut context = WgpuContext::new("src/shaders/default_fragment.wgsl", "all_magenta");
         let raw_buffer = context.execute(64, 64);
         assert!(raw_buffer.iter().all(|pixel| pixel == &[255, 0, 255, 255]));
     }

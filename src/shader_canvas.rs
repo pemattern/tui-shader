@@ -18,7 +18,7 @@ impl StatefulWidget for ShaderCanvas {
             for x in 0..width {
                 let index = (y * (width + WgpuContext::row_padding(width)) + x) as usize;
                 let pixel = raw_buffer[index];
-                let character = match state.character_rule {
+                let character = match state.options.character_rule {
                     CharacterRule::Always(character) => character,
                     CharacterRule::Map(map) => map(pixel),
                 };
@@ -33,14 +33,35 @@ impl StatefulWidget for ShaderCanvas {
 
 pub struct ShaderCanvasState {
     wgpu_context: WgpuContext,
-    character_rule: CharacterRule,
+    options: ShaderCanvasOptions,
 }
 
 impl ShaderCanvasState {
     pub fn new(path_to_fragment_shader: &str) -> Self {
+        Self::new_with_options(
+            path_to_fragment_shader,
+            ShaderCanvasOptions::default()
+        )
+    }
+
+    pub fn new_with_options(path_to_fragment_shader: &str, options: ShaderCanvasOptions) -> Self {
         Self {
-            wgpu_context: WgpuContext::new(path_to_fragment_shader),
+            wgpu_context: WgpuContext::new(path_to_fragment_shader, &options.entry_point),
+            options,
+        }
+    }
+}
+
+pub struct ShaderCanvasOptions {
+    character_rule: CharacterRule,
+    entry_point: String,
+}
+
+impl Default for ShaderCanvasOptions {
+    fn default() -> Self {
+        Self {
             character_rule: CharacterRule::default(),
+            entry_point: String::from("main"),
         }
     }
 }
