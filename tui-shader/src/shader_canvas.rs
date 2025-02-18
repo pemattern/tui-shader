@@ -38,10 +38,7 @@ pub struct ShaderCanvasState {
 
 impl ShaderCanvasState {
     pub fn new(path_to_fragment_shader: &str) -> Self {
-        Self::new_with_options(
-            path_to_fragment_shader,
-            ShaderCanvasOptions::default()
-        )
+        Self::new_with_options(path_to_fragment_shader, ShaderCanvasOptions::default())
     }
 
     pub fn new_with_options(path_to_fragment_shader: &str, options: ShaderCanvasOptions) -> Self {
@@ -53,8 +50,8 @@ impl ShaderCanvasState {
 }
 
 pub struct ShaderCanvasOptions {
-    character_rule: CharacterRule,
-    entry_point: String,
+    pub character_rule: CharacterRule,
+    pub entry_point: String,
 }
 
 impl Default for ShaderCanvasOptions {
