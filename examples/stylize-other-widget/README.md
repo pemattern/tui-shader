@@ -1,4 +1,4 @@
-# hello-shader example
+# stylize-other-widget example
 
 run this example from the root `tui-shader` directory with the command
 

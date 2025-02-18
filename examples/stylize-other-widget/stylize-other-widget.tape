@@ -1,11 +1,10 @@
-Output "target/stylize-other-widget.gif"
+Output "assets/stylize-other-widget.gif"
 Set FontFamily "JetBrainsMonoNL NF"
-Set Framerate 60
-Set Width 1920
-Set Height 1080
-Type@125ms "cargo run -p stylize-other-widget"
+Set Width 400
+Set Height 200
 Hide
-Sleep 500ms
+Type "cargo run --example=stylize-other-widget"
 Enter
+Sleep 2s
 Show
-Sleep 10s
+Sleep 6.4s

@@ -1,11 +1,12 @@
-Output "target/hello-shader.gif"
+Output "assets/hello-shader.gif"
 Set FontFamily "JetBrainsMonoNL NF"
-Set Framerate 60
-Set Width 1920
-Set Height 1080
-Type@125ms "cargo run -p hello-shader"
+Set Width 400
+Set Height 200
+Set Padding 0
+Set Margin 0
 Hide
-Sleep 500ms
+Type "cargo run --example=hello-shader"
 Enter
+Sleep 2s
 Show
 Sleep 10s
