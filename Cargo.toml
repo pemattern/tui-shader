@@ -2,7 +2,7 @@
 name = "tui-shader"
 authors = ["Paul Mattern <mail@paulmattern.dev>"]
 documentation = "https://docs.rs/tui-shader/latest/tui_shader/"
-version = "0.0.3"
+version = "0.0.4"
 edition = "2021"
 categories = ["graphics", "rendering", "gui"]
 description = "A ratatui widget that renders a fragment shader in the terminal"
@@ -28,3 +28,7 @@ path = "examples/hello-shader/main.rs"
 [[example]]
 name = "stylize-other-widget"
 path = "examples/stylize-other-widget/main.rs"
+
+[[example]]
+name = "pipe-into"
+path = "examples/pipe-into/main.rs"

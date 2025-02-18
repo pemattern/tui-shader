@@ -8,14 +8,15 @@
 >
 >
 > This crate is still very early in development, please expect:
->     - bugs,
->     - major breaking changes
->     - lack of documentation
->     - poor API design
->     - lots of other terrible things  
+>     - bugs.
+>     - major breaking changes.
+>     - lack of documentation.
+>     - poor API design.
+>     - lots of other terrible things.  
 
 ## Examples
 
+For the sake of simplicity, all examples run for 5 seconds, and then quit.
 To run examples use the following command:
 
 ```

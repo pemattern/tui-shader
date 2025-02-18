@@ -47,12 +47,12 @@ impl WgpuContext {
         let vertex_shader =
             device.create_shader_module(wgpu::include_wgsl!("shaders/fullscreen_vertex.wgsl"));
 
-        let shader_code =
+        let fragment_shader_source =
             fs::read_to_string(path_to_fragment_shader).expect("Unable to read fragment shader");
 
         let fragment_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: None,
-            source: wgpu::ShaderSource::Wgsl(shader_code.into()),
+            source: wgpu::ShaderSource::Wgsl(fragment_shader_source.into()),
         });
 
         let creation_time = Instant::now();

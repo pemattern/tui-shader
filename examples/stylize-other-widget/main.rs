@@ -1,45 +1,13 @@
-use ratatui::{
-    crossterm::event::Event,
-    widgets::{Paragraph, Wrap},
-};
-use tui_shader::shader_canvas::{ShaderCanvas, ShaderCanvasOptions, ShaderCanvasState};
-
-enum Message {
-    Redraw,
-    Exit,
-}
-
 pub fn main() -> std::io::Result<()> {
-    let (sender, receiver) = std::sync::mpsc::channel();
-    let input_sender = sender.clone();
-    std::thread::spawn(move || loop {
-        match ratatui::crossterm::event::read().unwrap() {
-            Event::Key(_) => input_sender.send(Message::Exit).unwrap(),
-            Event::Resize(_, _) => input_sender.send(Message::Redraw).unwrap(),
-            _ => {}
-        }
-    });
-
-    let redraw_sender = sender.clone();
-    std::thread::spawn(move || {
-        let mut last_tick = std::time::Instant::now();
-        loop {
-            if last_tick.elapsed().as_millis() > 16 {
-                redraw_sender.send(Message::Redraw).unwrap();
-                last_tick = std::time::Instant::now();
-            }
-        }
-    });
-
     let mut terminal = ratatui::init();
-    let mut state = ShaderCanvasState::new_with_options(
+    let mut state = tui_shader::ShaderCanvasState::new_with_options(
         "shaders/gradient.wgsl",
         // This sets the character for our ShaderCanvas to use to a Space,
         // which never displays the foreground color. This way we can use
         // the foreground coloring for a character that we specify in a
         // different widget
-        ShaderCanvasOptions {
-            character_rule: tui_shader::shader_canvas::CharacterRule::Always(' '),
+        tui_shader::ShaderCanvasOptions {
+            character_rule: tui_shader::CharacterRule::Always(' '),
             ..Default::default()
         },
     );
@@ -61,18 +29,20 @@ pub fn main() -> std::io::Result<()> {
         aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet
         clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet."#;
 
+    let start_time = std::time::Instant::now();
     loop {
         terminal.draw(|frame| {
-            frame.render_stateful_widget(ShaderCanvas, frame.area(), &mut state);
+            frame.render_stateful_widget(tui_shader::ShaderCanvas, frame.area(), &mut state);
             frame.render_widget(
-                Paragraph::new(lorem_ipsum).wrap(Wrap { trim: true }),
+                ratatui::widgets::Paragraph::new(lorem_ipsum)
+                    .wrap(ratatui::widgets::Wrap { trim: true }),
                 frame.area(),
             );
         })?;
-        match receiver.recv().unwrap() {
-            Message::Redraw => {}
-            Message::Exit => break,
+        if start_time.elapsed().as_secs() > 5 {
+            break;
         }
+        std::thread::sleep(std::time::Duration::from_millis(50));
     }
     ratatui::restore();
     Ok(())
