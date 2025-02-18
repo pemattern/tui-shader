@@ -33,7 +33,7 @@ pub fn main() -> std::io::Result<()> {
 
     let mut terminal = ratatui::init();
     let mut state = ShaderCanvasState::new_with_options(
-        "examples/stylize-other-widget/src/shader.wgsl",
+        "shaders/gradient.wgsl",
         // This sets the character for our ShaderCanvas to use to a Space,
         // which never displays the foreground color. This way we can use
         // the foreground coloring for a character that we specify in a

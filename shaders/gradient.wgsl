@@ -11,3 +11,4 @@ fn main(@location(0) fragCoord: vec2<f32>) -> @location(0) vec4<f32> {
 
     return vec4<f32>(x, 0.5, y, 1.0);
 }
+

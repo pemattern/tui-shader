@@ -29,7 +29,7 @@ pub fn main() -> std::io::Result<()> {
     });
 
     let mut terminal = ratatui::init();
-    let mut state = ShaderCanvasState::new("examples/hello-shader/src/shader.wgsl");
+    let mut state = ShaderCanvasState::new("shaders/voronoi.wgsl");
     loop {
         terminal.draw(|frame| {
             frame.render_stateful_widget(ShaderCanvas, frame.area(), &mut state);

@@ -1,9 +1,5 @@
-[workspace]
-resolver = "2"
-members = ["tui-shader", "examples/*"]
-default-members = ["tui-shader", "examples/*"]
-
-[workspace.package]
+[package]
+name = "tui-shader"
 authors = ["Paul Mattern <mail@paulmattern.dev>"]
 documentation = "https://docs.rs/tui-shader/latest/tui_shader/"
 version = "0.0.2"
@@ -17,10 +13,17 @@ license = "MIT OR Apache-2.0"
 readme = "README.md"
 rust-version = "1.74.0"
 
-[workspace.dependencies]
+[dependencies]
 bytemuck = "1.21.0"
 flume = "0.11.1"
 pollster = "0.4.0"
 ratatui = "0.29.0"
 wgpu = "24.0.1"
-tui-shader = { path = "tui-shader", version = "0.0.2" }
+
+[[example]]
+name = "hello-shader"
+path = "examples/hello-shader/main.rs"
+
+[[example]]
+name = "stylize-other-widget"
+path = "examples/stylize-other-widget/main.rs"
