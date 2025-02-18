@@ -1,6 +1,12 @@
-[package]
-name = "tui-shader"
-version = "0.0.1-alpha.1"
+[workspace]
+resolver = "2"
+members = ["tui-shader", "examples/*"]
+default-members = ["tui-shader", "examples/*"]
+
+[workspace.package]
+authors = ["Paul Mattern <mail@paulmattern.dev>"]
+documentation = "https://docs.rs/tui-shader/latest/tui_shader/"
+version = "0.0.2"
 edition = "2021"
 categories = ["graphics", "rendering", "gui"]
 description = "A ratatui widget that renders a fragment shader in the terminal"
@@ -9,10 +15,12 @@ repository = "https://github.com/pemattern/tui-shader"
 keywords = ["tui", "shader", "wgpu", "terminal", "graphics"]
 license = "MIT OR Apache-2.0"
 readme = "README.md"
+rust-version = "1.74.0"
 
-[dependencies]
+[workspace.dependencies]
 bytemuck = "1.21.0"
 flume = "0.11.1"
 pollster = "0.4.0"
 ratatui = "0.29.0"
 wgpu = "24.0.1"
+tui-shader = { path = "tui-shader", version = "0.0.2" }
