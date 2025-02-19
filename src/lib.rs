@@ -1,8 +1,10 @@
+pub mod sample;
 mod wgpu_context;
 
 use ratatui::layout::{Position, Rect};
 use ratatui::style::Color;
 use ratatui::widgets::StatefulWidget;
+use sample::Sample;
 
 use crate::wgpu_context::WgpuContext;
 
@@ -22,17 +24,26 @@ impl StatefulWidget for ShaderCanvas {
                 let pixel = raw_buffer[index];
                 let character = match state.options.character_rule {
                     CharacterRule::Always(character) => character,
-                    CharacterRule::Map(map) => map(pixel),
+                    CharacterRule::Map(map) => map(pixel.into()),
+                };
+                let color = Color::Rgb(pixel[0], pixel[1], pixel[2]);
+                let (fg_color, bg_color) = match state.options.color_rule {
+                    ColorRule::Fg(other) => (color, other),
+                    ColorRule::Bg(other) => (other, color),
+                    ColorRule::FgAndBg => (color, color),
+                    ColorRule::Map(map) => map(pixel.into()),
                 };
                 buf.cell_mut(Position::new(x, y))
                     .unwrap()
-                    .set_fg(Color::Rgb(pixel[0], pixel[1], pixel[2]))
+                    .set_fg(fg_color)
+                    .set_bg(bg_color)
                     .set_char(character);
             }
         }
     }
 }
 
+#[derive(Debug, Default, Clone, Eq, PartialEq)]
 pub struct ShaderCanvasState {
     wgpu_context: WgpuContext,
     options: ShaderCanvasOptions,
@@ -51,8 +62,10 @@ impl ShaderCanvasState {
     }
 }
 
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ShaderCanvasOptions {
     pub character_rule: CharacterRule,
+    pub color_rule: ColorRule,
     pub entry_point: String,
 }
 
@@ -60,18 +73,46 @@ impl Default for ShaderCanvasOptions {
     fn default() -> Self {
         Self {
             character_rule: CharacterRule::default(),
+            color_rule: ColorRule::default(),
             entry_point: String::from("main"),
         }
     }
 }
 
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum CharacterRule {
     Always(char),
-    Map(fn([u8; 4]) -> char),
+    Map(fn(Sample) -> char),
 }
 
 impl Default for CharacterRule {
     fn default() -> Self {
         Self::Always('█')
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum ColorRule {
+    Fg(Color),
+    Bg(Color),
+    FgAndBg,
+    Map(fn(Sample) -> (Color, Color)),
+}
+
+impl Default for ColorRule {
+    fn default() -> Self {
+        ColorRule::Fg(Color::Black)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_wgsl_context() {
+        let mut context = WgpuContext::new("src/shaders/default_fragment.wgsl", "all_magenta");
+        let raw_buffer = context.execute(64, 64);
+        assert!(raw_buffer.iter().all(|pixel| pixel == &[255, 0, 255, 255]));
     }
 }

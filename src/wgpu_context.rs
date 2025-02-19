@@ -5,10 +5,11 @@ use wgpu::util::DeviceExt;
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct ShaderInput {
+struct ShaderInput {
     time: f32,
 }
 
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct WgpuContext {
     device: wgpu::Device,
     queue: wgpu::Queue,
@@ -266,5 +267,11 @@ impl WgpuContext {
         }
         self.output_buffer.unmap();
         slice
+    }
+}
+
+impl Default for WgpuContext {
+    fn default() -> Self {
+        Self::new("src/shaders/default_fragment.wgsl", "all_magenta")
     }
 }

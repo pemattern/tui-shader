@@ -2,12 +2,17 @@ pub fn main() -> std::io::Result<()> {
     let mut terminal = ratatui::init();
     let mut state = tui_shader::ShaderCanvasState::new_with_options(
         "shaders/gradient.wgsl",
-        // This sets the character for our ShaderCanvas to use to a Space,
-        // which never displays the foreground color. This way we can use
-        // the foreground coloring for a character that we specify in a
-        // different widget
         tui_shader::ShaderCanvasOptions {
             character_rule: tui_shader::CharacterRule::Always(' '),
+            color_rule: tui_shader::ColorRule::Map(|sample| {
+                let color = ratatui::style::Color::Rgb(sample.r(), sample.g(), sample.b());
+                let sum = sample.r() as u16 + sample.g() as u16 + sample.b() as u16;
+                if sum > 400 {
+                    (ratatui::style::Color::Black, color)
+                } else {
+                    (color, ratatui::style::Color::Black)
+                }
+            }),
             ..Default::default()
         },
     );
@@ -39,7 +44,7 @@ pub fn main() -> std::io::Result<()> {
                 frame.area(),
             );
         })?;
-        if start_time.elapsed().as_secs() > 5 {
+        if start_time.elapsed().as_secs() > 7 {
             break;
         }
         std::thread::sleep(std::time::Duration::from_millis(50));
