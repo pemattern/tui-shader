@@ -28,16 +28,19 @@ impl StatefulWidget for ShaderCanvas {
                 };
                 let color = Color::Rgb(pixel[0], pixel[1], pixel[2]);
                 let (fg_color, bg_color) = match state.options.color_rule {
-                    ColorRule::Fg(other) => (color, other),
-                    ColorRule::Bg(other) => (other, color),
-                    ColorRule::FgAndBg => (color, color),
+                    ColorRule::Fg => (Some(color), None),
+                    ColorRule::Bg => (None, Some(color)),
+                    ColorRule::FgAndBg => (Some(color), Some(color)),
                     ColorRule::Map(map) => map(pixel.into()),
                 };
-                buf.cell_mut(Position::new(x, y))
-                    .unwrap()
-                    .set_fg(fg_color)
-                    .set_bg(bg_color)
-                    .set_char(character);
+                let cell = buf.cell_mut(Position::new(x, y)).unwrap();
+                if let Some(color) = fg_color {
+                    cell.set_fg(color);
+                }
+                if let Some(color) = bg_color {
+                    cell.set_bg(color);
+                }
+                cell.set_char(character);
             }
         }
     }
@@ -93,15 +96,15 @@ impl Default for CharacterRule {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum ColorRule {
-    Fg(Color),
-    Bg(Color),
+    Fg,
+    Bg,
     FgAndBg,
-    Map(fn(Sample) -> (Color, Color)),
+    Map(fn(Sample) -> (Option<Color>, Option<Color>)),
 }
 
 impl Default for ColorRule {
     fn default() -> Self {
-        ColorRule::Fg(Color::Black)
+        ColorRule::Fg
     }
 }
 

@@ -8,9 +8,9 @@ pub fn main() -> std::io::Result<()> {
                 let color = ratatui::style::Color::Rgb(sample.r(), sample.g(), sample.b());
                 let sum = sample.r() as u16 + sample.g() as u16 + sample.b() as u16;
                 if sum > 400 {
-                    (ratatui::style::Color::Black, color)
+                    (Some(ratatui::style::Color::Black), Some(color))
                 } else {
-                    (color, ratatui::style::Color::Black)
+                    (Some(color), None)
                 }
             }),
             ..Default::default()
@@ -47,7 +47,7 @@ pub fn main() -> std::io::Result<()> {
         if start_time.elapsed().as_secs() > 7 {
             break;
         }
-        std::thread::sleep(std::time::Duration::from_millis(50));
+        std::thread::sleep(std::time::Duration::from_millis(20));
     }
     ratatui::restore();
     Ok(())

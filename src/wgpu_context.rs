@@ -272,6 +272,6 @@ impl WgpuContext {
 
 impl Default for WgpuContext {
     fn default() -> Self {
-        Self::new("src/shaders/default_fragment.wgsl", "all_magenta")
+        Self::new("src/shaders/default_fragment.wgsl", "magenta")
     }
 }
