@@ -22,13 +22,17 @@ ratatui = "0.29.0"
 wgpu = "24.0.1"
 
 [[example]]
+name = "color-rule"
+path = "examples/color-rule/main.rs"
+
+[[example]]
 name = "hello-shader"
 path = "examples/hello-shader/main.rs"
 
 [[example]]
-name = "stylize-other-widget"
-path = "examples/stylize-other-widget/main.rs"
-
-[[example]]
 name = "pipe-into"
 path = "examples/pipe-into/main.rs"
+
+[[example]]
+name = "stylize-other-widget"
+path = "examples/stylize-other-widget/main.rs"

@@ -2,7 +2,7 @@
 
 ## What is tui-shader?
 
-`tui-shader` is a `StatefulWidget` for the `ratatui` crate which provides a simple API that allows us to harness of power of GPU shaders to make our terminals a more beautiful place.
+`tui-shader` provides the `ShaderCanvas` `StatefulWidget` for the `ratatui` crate allowing us to harness the power of GPU shaders to make our terminals a more beautiful place.
 
 > [!WARNING]
 >
@@ -11,7 +11,7 @@
 
 ## Examples
 
-For the sake of simplicity, all examples run for 5 seconds, and then quit.
+For the sake of simplicity, all examples run for a few seconds, and then quit.
 To run examples use the following command:
 
 ```

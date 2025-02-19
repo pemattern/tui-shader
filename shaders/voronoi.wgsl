@@ -39,6 +39,6 @@ fn voronoi_3(p: vec3<f32>) -> f32 {
 @fragment
 fn main(@location(0) fragCoord: vec2<f32>) -> @location(0) vec4<f32> {
     let t = voronoi_3(vec3<f32>(fragCoord.x * 5.0, fragCoord.y * 5.0, input.time));
-    let color = mix(vec4<f32>(0.6, 0.8, 0.9, 1.0), vec4<f32>(0.1, 0.5, 0.6, 1.0), t);
+    let color = mix(vec4<f32>(0.6, 0.8, 0.9, 1.0), vec4<f32>(0.1, 0.3, 0.4, 1.0), t);
     return color;
 }

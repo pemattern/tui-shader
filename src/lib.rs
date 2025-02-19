@@ -111,7 +111,7 @@ mod tests {
 
     #[test]
     fn default_wgsl_context() {
-        let mut context = WgpuContext::new("src/shaders/default_fragment.wgsl", "all_magenta");
+        let mut context = WgpuContext::default();
         let raw_buffer = context.execute(64, 64);
         assert!(raw_buffer.iter().all(|pixel| pixel == &[255, 0, 255, 255]));
     }

@@ -1,52 +1,35 @@
+use ratatui::style::Stylize;
+
 pub fn main() -> std::io::Result<()> {
     let mut terminal = ratatui::init();
-    let mut state = tui_shader::ShaderCanvasState::new_with_options(
-        "shaders/gradient.wgsl",
+    let mut shader_state = tui_shader::ShaderCanvasState::new_with_options(
+        "shaders/voronoi.wgsl",
         tui_shader::ShaderCanvasOptions {
             character_rule: tui_shader::CharacterRule::Always(' '),
-            color_rule: tui_shader::ColorRule::Map(|sample| {
-                let color = ratatui::style::Color::Rgb(sample.r(), sample.g(), sample.b());
-                let sum = sample.r() as u16 + sample.g() as u16 + sample.b() as u16;
-                if sum > 400 {
-                    (ratatui::style::Color::Black, color)
-                } else {
-                    (color, ratatui::style::Color::Black)
-                }
-            }),
             ..Default::default()
         },
     );
-
-    let lorem_ipsum = r#"Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor
-        invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam
-        et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est
-        Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed
-        diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua.
-        At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea
-        takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscingi
-        elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam
-        voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no
-        sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur
-        sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat,
-        sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd
-        gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet
-        consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna
-        aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet
-        clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet."#;
-
+    let mut list_state = ratatui::widgets::ListState::default();
+    *list_state.selected_mut() = Some(5);
     let start_time = std::time::Instant::now();
-    loop {
+    while start_time.elapsed().as_secs() < 7 {
         terminal.draw(|frame| {
-            frame.render_stateful_widget(tui_shader::ShaderCanvas, frame.area(), &mut state);
-            frame.render_widget(
-                ratatui::widgets::Paragraph::new(lorem_ipsum)
-                    .wrap(ratatui::widgets::Wrap { trim: true }),
+            frame.render_stateful_widget(tui_shader::ShaderCanvas, frame.area(), &mut shader_state);
+            frame.render_stateful_widget(
+                ratatui::widgets::List::new([
+                    "hella data",
+                    "this is some important stuff...",
+                    "very good entry",
+                    "ok, now we're getting serious",
+                    "butter",
+                    "2shader4me",
+                ])
+                .highlight_style(ratatui::style::Style::new().reversed())
+                .block(ratatui::widgets::Block::bordered()),
                 frame.area(),
+                &mut list_state,
             );
         })?;
-        if start_time.elapsed().as_secs() > 7 {
-            break;
-        }
         std::thread::sleep(std::time::Duration::from_millis(50));
     }
     ratatui::restore();
