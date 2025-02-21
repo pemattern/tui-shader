@@ -1,7 +1,7 @@
 Output "assets/pipe-into.gif"
 Set FontFamily "JetBrainsMonoNL NF"
 Set Width 880
-Set Height 200
+Set Height 150
 Type@50ms `echo "fancy..." | cargo run --example=pipe-into`
 Sleep 1s
 Hide
