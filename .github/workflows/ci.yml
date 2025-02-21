@@ -15,7 +15,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install dependencies for wgpu
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwayland-dev \
+            libx11-dev \
+            libx11-xcb-dev
+    
     - name: Build
       run: cargo build --verbose
     - name: Build examples
