@@ -4,13 +4,15 @@ pub fn main() -> std::io::Result<()> {
         "shaders/gradient.wgsl",
         tui_shader::ShaderCanvasOptions {
             character_rule: tui_shader::CharacterRule::Always(' '),
-            color_rule: tui_shader::ColorRule::Map(|sample| {
+            style_rule: tui_shader::StyleRule::Map(|sample| {
                 let color = ratatui::style::Color::Rgb(sample.r(), sample.g(), sample.b());
                 let sum = sample.r() as u16 + sample.g() as u16 + sample.b() as u16;
                 if sum > 400 {
-                    (Some(ratatui::style::Color::Black), Some(color))
+                    ratatui::style::Style::new()
+                        .bg(color)
+                        .fg(ratatui::style::Color::Black)
                 } else {
-                    (Some(color), None)
+                    ratatui::style::Style::new().fg(color)
                 }
             }),
             ..Default::default()

@@ -2,7 +2,7 @@ pub mod sample;
 mod wgpu_context;
 
 use ratatui::layout::{Position, Rect};
-use ratatui::style::Color;
+use ratatui::style::{Color, Style};
 use ratatui::widgets::StatefulWidget;
 use sample::Sample;
 
@@ -27,19 +27,14 @@ impl StatefulWidget for ShaderCanvas {
                     CharacterRule::Map(map) => map(pixel.into()),
                 };
                 let color = Color::Rgb(pixel[0], pixel[1], pixel[2]);
-                let (fg_color, bg_color) = match state.options.color_rule {
-                    ColorRule::Fg => (Some(color), None),
-                    ColorRule::Bg => (None, Some(color)),
-                    ColorRule::FgAndBg => (Some(color), Some(color)),
-                    ColorRule::Map(map) => map(pixel.into()),
+                let style = match state.options.style_rule {
+                    StyleRule::ColorFg => Style::new().fg(color),
+                    StyleRule::ColorBg => Style::new().bg(color),
+                    StyleRule::ColorFgAndBg => Style::new().fg(color).bg(color),
+                    StyleRule::Map(map) => map(pixel.into()),
                 };
                 let cell = buf.cell_mut(Position::new(x, y)).unwrap();
-                if let Some(color) = fg_color {
-                    cell.set_fg(color);
-                }
-                if let Some(color) = bg_color {
-                    cell.set_bg(color);
-                }
+                cell.set_style(style);
                 cell.set_char(character);
             }
         }
@@ -68,7 +63,7 @@ impl ShaderCanvasState {
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ShaderCanvasOptions {
     pub character_rule: CharacterRule,
-    pub color_rule: ColorRule,
+    pub style_rule: StyleRule,
     pub entry_point: String,
 }
 
@@ -76,7 +71,7 @@ impl Default for ShaderCanvasOptions {
     fn default() -> Self {
         Self {
             character_rule: CharacterRule::default(),
-            color_rule: ColorRule::default(),
+            style_rule: StyleRule::default(),
             entry_point: String::from("main"),
         }
     }
@@ -90,22 +85,17 @@ pub enum CharacterRule {
 
 impl Default for CharacterRule {
     fn default() -> Self {
-        Self::Always('█')
+        Self::Always(' ')
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub enum ColorRule {
-    Fg,
-    Bg,
-    FgAndBg,
-    Map(fn(Sample) -> (Option<Color>, Option<Color>)),
-}
-
-impl Default for ColorRule {
-    fn default() -> Self {
-        ColorRule::Fg
-    }
+#[derive(Debug, Default, Clone, Eq, PartialEq)]
+pub enum StyleRule {
+    ColorFg,
+    #[default]
+    ColorBg,
+    ColorFgAndBg,
+    Map(fn(Sample) -> Style),
 }
 
 #[cfg(test)]

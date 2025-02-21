@@ -22,8 +22,8 @@ ratatui = "0.29.0"
 wgpu = "24.0.1"
 
 [[example]]
-name = "color-rule"
-path = "examples/color-rule/main.rs"
+name = "style-rule"
+path = "examples/style-rule/main.rs"
 
 [[example]]
 name = "hello-shader"
