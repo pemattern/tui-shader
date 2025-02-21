@@ -20,10 +20,8 @@ jobs:
 
     - name: Install llvmpipe and lavapipe
       run: |
-        sudo apt-get update -y -qq
-        sudo add-apt-repository ppa:oibaf/graphics-drivers -y
-        sudo apt-get update
-        sudo apt install -y libegl1-mesa libgl1-mesa-dri libxcb-xfixes0-dev mesa-vulkan-drivers
+        sudo apt-get update -y
+        sudo apt-get install -y mesa-vulkan-drivers libvulkan1 vulkan-tools vulkan-validationlayers
         
     - name: Build
       run: cargo build --verbose
