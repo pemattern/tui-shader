@@ -12,7 +12,7 @@ keywords = ["tui", "shader", "wgpu", "terminal", "graphics"]
 license = "MIT OR Apache-2.0"
 readme = "README.md"
 rust-version = "1.74.0"
-exclude = ["assets/"]
+exclude = ["assets/", ".github/"]
 
 [dependencies]
 bytemuck = "1.21.0"
