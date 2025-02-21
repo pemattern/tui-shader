@@ -29,6 +29,7 @@
 
 mod wgpu_context;
 
+use pollster::FutureExt;
 use ratatui::layout::{Position, Rect};
 use ratatui::style::{Color, Style};
 use ratatui::widgets::StatefulWidget;
@@ -43,7 +44,7 @@ impl StatefulWidget for ShaderCanvas {
         let width = area.width;
         let height = area.height;
 
-        let raw_buffer = state.wgpu_context.execute(width, height);
+        let raw_buffer = state.wgpu_context.execute(width, height).block_on();
 
         for y in 0..height {
             for x in 0..width {
@@ -81,7 +82,8 @@ impl ShaderCanvasState {
 
     pub fn new_with_options(path_to_fragment_shader: &str, options: ShaderCanvasOptions) -> Self {
         Self {
-            wgpu_context: WgpuContext::new(path_to_fragment_shader, &options.entry_point),
+            wgpu_context: WgpuContext::new(path_to_fragment_shader, &options.entry_point)
+                .block_on(),
             options,
         }
     }
@@ -160,7 +162,7 @@ mod tests {
     #[test]
     fn default_wgsl_context() {
         let mut context = WgpuContext::default();
-        let raw_buffer = context.execute(64, 64);
+        let raw_buffer = context.execute(64, 64).block_on();
         assert!(raw_buffer.iter().all(|pixel| pixel == &[255, 0, 255, 255]));
     }
 }
