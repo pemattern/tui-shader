@@ -25,13 +25,21 @@ jobs:
           libwayland-dev \
           libx11-dev \
           libx11-xcb-dev
+
+    - name: Set environment variables for wgpu (headless mode)
+      run: |
+        export WGPU_BACKEND=vulkan
+        export WGPU_POWER_PREFERENCE=low-power
     
     - name: Build
       run: cargo build --verbose
+      
     - name: Build examples
       run: cargo build --examples
+      
     - name: Run tests
       run: cargo test --verbose
+      
     - name: Run doc tests
       run: cargo test --doc
 
