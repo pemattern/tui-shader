@@ -1,10 +1,37 @@
-pub mod sample;
+//! The `tui-shader` crate enables GPU accelerated styling for [`Ratatui`](https://ratatui.rs)
+//! based applications.
+//!
+//! Computing styles at runtime can be expensive when run on the CPU, despite the
+//! small "resolution" of cells in a terminal window. Utilizing the power of the
+//! GPU helps us update the styling in the terminal at considerably higher framerates.
+//!
+//! ## Quickstart
+//!
+//! Add `ratatui` and `tui-shader` as dependencies to your Corgo.toml:
+//!
+//! ```shell
+//! cargo add ratatui tui-shader
+//! ```
+//!
+//! Then create a new application:
+//!
+//! ```rust,no_run
+//! let mut terminal = ratatui::init();
+//! let mut state = tui_shader::ShaderCanvasState::default();
+//! let start_time = std::time::Instant::now();
+//! while start_time.elapsed().as_secs() < 5 {
+//!     terminal.draw(|frame| {
+//!         frame.render_stateful_widget(tui_shader::ShaderCanvas, frame.area(), &mut state);
+//!     }).unwrap();
+//! }
+//! ratatui::restore();
+//! ```
+
 mod wgpu_context;
 
 use ratatui::layout::{Position, Rect};
 use ratatui::style::{Color, Style};
 use ratatui::widgets::StatefulWidget;
-use sample::Sample;
 
 use crate::wgpu_context::WgpuContext;
 
@@ -96,6 +123,34 @@ pub enum StyleRule {
     ColorBg,
     ColorFgAndBg,
     Map(fn(Sample) -> Style),
+}
+
+pub struct Sample {
+    value: [u8; 4],
+}
+
+impl Sample {
+    pub fn r(&self) -> u8 {
+        self.value[0]
+    }
+
+    pub fn g(&self) -> u8 {
+        self.value[1]
+    }
+
+    pub fn b(&self) -> u8 {
+        self.value[2]
+    }
+
+    pub fn a(&self) -> u8 {
+        self.value[3]
+    }
+}
+
+impl From<[u8; 4]> for Sample {
+    fn from(value: [u8; 4]) -> Self {
+        Self { value }
+    }
 }
 
 #[cfg(test)]

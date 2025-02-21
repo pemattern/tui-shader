@@ -1,10 +1,11 @@
 Output "assets/stylize-other-widget.gif"
 Set FontFamily "JetBrainsMonoNL NF"
+Set FontSize 10
 Set Width 400
-Set Height 200
+Set Height 300
 Hide
 Type "cargo run --example=stylize-other-widget"
 Enter
-Sleep 2s
+Sleep 1s
 Show
-Sleep 6.4s
+Sleep 5s

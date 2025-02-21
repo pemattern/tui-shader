@@ -3,7 +3,6 @@ pub fn main() -> std::io::Result<()> {
     let mut state = tui_shader::ShaderCanvasState::new_with_options(
         "shaders/gradient.wgsl",
         tui_shader::ShaderCanvasOptions {
-            character_rule: tui_shader::CharacterRule::Always(' '),
             style_rule: tui_shader::StyleRule::Map(|sample| {
                 let color = ratatui::style::Color::Rgb(sample.r(), sample.g(), sample.b());
                 let sum = sample.r() as u16 + sample.g() as u16 + sample.b() as u16;
@@ -49,7 +48,7 @@ pub fn main() -> std::io::Result<()> {
         if start_time.elapsed().as_secs() > 7 {
             break;
         }
-        std::thread::sleep(std::time::Duration::from_millis(20));
+        std::thread::sleep(std::time::Duration::from_millis(10));
     }
     ratatui::restore();
     Ok(())

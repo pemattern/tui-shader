@@ -6,6 +6,7 @@ pub fn main() -> std::io::Result<()> {
         "shaders/voronoi.wgsl",
         tui_shader::ShaderCanvasOptions {
             character_rule: tui_shader::CharacterRule::Always(' '),
+            style_rule: tui_shader::StyleRule::ColorFg,
             ..Default::default()
         },
     );
@@ -13,7 +14,6 @@ pub fn main() -> std::io::Result<()> {
         "shaders/starlight.wgsl",
         tui_shader::ShaderCanvasOptions {
             character_rule: tui_shader::CharacterRule::Always(' '),
-            style_rule: tui_shader::StyleRule::ColorBg,
             ..Default::default()
         },
     );
@@ -47,7 +47,7 @@ pub fn main() -> std::io::Result<()> {
                 &mut list_state,
             );
         })?;
-        std::thread::sleep(std::time::Duration::from_millis(50));
+        std::thread::sleep(std::time::Duration::from_millis(10));
     }
     ratatui::restore();
     Ok(())
