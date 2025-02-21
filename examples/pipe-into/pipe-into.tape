@@ -1,10 +1,11 @@
-Output "assets/stylize-other-widget.gif"
+Output "assets/pipe-into.gif"
 Set FontFamily "JetBrainsMonoNL NF"
-Set Width 400
+Set Width 880
 Set Height 200
+Type@50ms `echo "fancy..." | cargo run --example=pipe-into`
+Sleep 1s
 Hide
-Type "cargo run --example=stylize-other-widget"
 Enter
-Sleep 2s
+Sleep 1s
 Show
-Sleep 6.4s
+Sleep 5s

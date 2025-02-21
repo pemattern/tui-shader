@@ -11,6 +11,8 @@
 
 ## Examples
 
+![Example](https://github.com/pemattern/tui-shader/blob/main/assets/pipe-into.gif)
+
 For the sake of simplicity, all examples run for a few seconds, and then quit.
 To run examples use the following command:
 

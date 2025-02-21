@@ -1,3 +1,5 @@
+use tui_shader::ShaderCanvasOptions;
+
 pub fn main() -> std::io::Result<()> {
     let mut s = String::new();
     {
@@ -6,17 +8,20 @@ pub fn main() -> std::io::Result<()> {
     }
 
     let mut terminal = ratatui::init();
-    let mut state = tui_shader::ShaderCanvasState::new("shaders/gradient.wgsl");
+    let mut state = tui_shader::ShaderCanvasState::new_with_options(
+        "shaders/gradient.wgsl",
+        ShaderCanvasOptions {
+            style_rule: tui_shader::StyleRule::ColorFg,
+            ..Default::default()
+        },
+    );
 
     let start_time = std::time::Instant::now();
-    loop {
+    while start_time.elapsed().as_secs() < 7 {
         terminal.draw(|frame| {
             frame.render_stateful_widget(tui_shader::ShaderCanvas, frame.area(), &mut state);
             frame.render_widget(ratatui::widgets::Paragraph::new(s.as_str()), frame.area());
         })?;
-        if start_time.elapsed().as_secs() > 5 {
-            break;
-        }
         std::thread::sleep(std::time::Duration::from_millis(10));
     }
     ratatui::restore();
