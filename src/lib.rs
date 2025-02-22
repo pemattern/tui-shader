@@ -36,6 +36,13 @@ use ratatui::widgets::StatefulWidget;
 
 use crate::wgpu_context::WgpuContext;
 
+/// `ShaderCanvas` is a unit struct which implements the `StatefulWidget` trait from Ratatui.
+/// It holds the logic for applying the result of GPU computation to the `Buffer` struct which
+/// Ratatui uses to display to the terminal.
+///
+/// ```rust,no_run
+/// frame.render_stateful_widget(ShaderCanvas, frame.area(), &mut state);
+/// ```
 pub struct ShaderCanvas;
 
 impl StatefulWidget for ShaderCanvas {
