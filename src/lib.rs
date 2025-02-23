@@ -99,11 +99,11 @@ impl ShaderCanvasState {
     }
 
     /// Creates a new [`ShaderCanvasState`] by passing in the path to the desired fragment shader.
-    /// The shader must be written in WGSL. The [`ShaderCanvasState`] can be customized.
+    /// The shader must be written in WGSL. The [`ShaderCanvasOptions`] can be customized.
     ///
     /// ```rust,no_run
     /// let state = tui_shader::ShaderCanvasState::new_with_options("path/to/shader.wgsl",
-    ///     tui_shader::ShaderCanvasState {
+    ///     tui_shader::ShaderCanvasOptions {
     ///         style_rule: StyleRule::Fg,
     ///         entry_point: "fragment",
     ///         ..Default::default()
@@ -119,6 +119,7 @@ impl ShaderCanvasState {
     }
 }
 
+/// Contains options to customize the behaviour of the ShaderCanvas.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ShaderCanvasOptions {
     pub character_rule: CharacterRule,
@@ -136,6 +137,11 @@ impl Default for ShaderCanvasOptions {
     }
 }
 
+/// Determines which character to use for Cell.
+/// [`CharacterRule::Always`] takes a single char and applies it to all Cells in the [`ShaderCanvas`].
+/// [`CharacterRule::Map`] takes a function as an argument and allows you to map the input [`Sample`] to
+/// a character. For example, one might use the transparency value from the shader ([Sample::a]) and map
+/// it to a different character depending on the value.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum CharacterRule {
     Always(char),
@@ -159,6 +165,7 @@ pub enum StyleRule {
 
 pub struct Sample {
     value: [u8; 4],
+    position: (u16, u16),
 }
 
 impl Sample {
@@ -177,11 +184,13 @@ impl Sample {
     pub fn a(&self) -> u8 {
         self.value[3]
     }
-}
 
-impl From<[u8; 4]> for Sample {
-    fn from(value: [u8; 4]) -> Self {
-        Self { value }
+    pub fn x(&self) -> u16 {
+        self.position.0
+    }
+
+    pub fn y(&self) -> u16 {
+        self.position.1
     }
 }
 
