@@ -41,7 +41,12 @@ use crate::wgpu_context::WgpuContext;
 /// Ratatui uses to display to the terminal.
 ///
 /// ```rust,no_run
-/// frame.render_stateful_widget(ShaderCanvas, frame.area(), &mut state);
+/// let mut terminal = ratatui::init();
+/// let mut state = tui_shader::ShaderCanvasState:default();
+/// terminal.draw(|frame| {
+///     frame.render_stateful_widget(ShaderCanvas, frame.area(), &mut state);
+/// }
+/// ratatui::restore();
 /// ```
 pub struct ShaderCanvas;
 
@@ -76,6 +81,9 @@ impl StatefulWidget for ShaderCanvas {
     }
 }
 
+/// State struct for [`ShaderCanvas`].
+///
+/// This struct holds values that may want to be altered at runtime.
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
 pub struct ShaderCanvasState {
     wgpu_context: WgpuContext,
@@ -83,10 +91,25 @@ pub struct ShaderCanvasState {
 }
 
 impl ShaderCanvasState {
+    /// Creates a new [`ShaderCanvasState`] by passing in the path to the desired fragment shader.
+    /// The shader must be written in WGSL. The [`ShaderCanvasOptions`] will be set to
+    /// [`Self::default()`].
     pub fn new(path_to_fragment_shader: &str) -> Self {
         Self::new_with_options(path_to_fragment_shader, ShaderCanvasOptions::default())
     }
 
+    /// Creates a new [`ShaderCanvasState`] by passing in the path to the desired fragment shader.
+    /// The shader must be written in WGSL. The [`ShaderCanvasState`] can be customized.
+    ///
+    /// ```rust,no_run
+    /// let state = tui_shader::ShaderCanvasState::new_with_options("path/to/shader.wgsl",
+    ///     tui_shader::ShaderCanvasState {
+    ///         style_rule: StyleRule::Fg,
+    ///         entry_point: "fragment",
+    ///         ..Default::default()
+    ///     }
+    /// );
+    /// ```
     pub fn new_with_options(path_to_fragment_shader: &str, options: ShaderCanvasOptions) -> Self {
         Self {
             wgpu_context: WgpuContext::new(path_to_fragment_shader, &options.entry_point)
