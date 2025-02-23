@@ -6,7 +6,10 @@ use wgpu::util::DeviceExt;
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 struct ShaderInput {
+    // struct field order matters
     time: f32,
+    padding: f32,
+    resolution: [f32; 2],
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -66,6 +69,8 @@ impl WgpuContext {
 
         let shader_input = ShaderInput {
             time: creation_time.elapsed().as_secs_f32(),
+            resolution: [width.into(), height.into()],
+            padding: 0f32,
         };
 
         let shader_input_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -251,7 +256,11 @@ impl WgpuContext {
         self.queue.write_buffer(
             &self.shader_input_buffer,
             0,
-            bytemuck::cast_slice(&[ShaderInput { time: elapsed }]),
+            bytemuck::cast_slice(&[ShaderInput {
+                time: elapsed,
+                resolution: [self.width.into(), self.height.into()],
+                padding: 0f32,
+            }]),
         );
         self.queue.submit(Some(command_encoder.finish()));
 

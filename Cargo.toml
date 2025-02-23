@@ -21,6 +21,13 @@ pollster = "0.4.0"
 ratatui = "0.29.0"
 wgpu = "24.0.1"
 
+[dev-dependencies]
+rand = "0.9.0"
+
+[[example]]
+name = "demo"
+path = "examples/demo/main.rs"
+
 [[example]]
 name = "style-rule"
 path = "examples/style-rule/main.rs"
