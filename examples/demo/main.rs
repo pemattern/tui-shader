@@ -1,4 +1,3 @@
-use rand::seq::{IndexedMutRandom, IndexedRandom};
 use ratatui::style::Stylize;
 
 fn main() {
