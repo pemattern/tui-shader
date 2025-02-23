@@ -150,11 +150,20 @@ pub enum CharacterRule {
 }
 
 impl Default for CharacterRule {
+    /// Returns `Self::Always(' ')`
     fn default() -> Self {
         Self::Always(' ')
     }
 }
 
+/// Determines how to style a Cell.
+/// [`StyleRule::ColorFg`] only applies the color from the shader to the foreground of the Cell.
+/// [`StyleRule::ColorBg`] only applies the color from the shader to the background of the Cell. This
+/// is the default value.
+/// [`StyleRule::ColorFgAndBg`] applies the color from the shader to the foreground and background of the Cell.
+/// [`StyleRule::Map`] takes a function as an argument and allows you to map the input [`Sample`] to
+/// a Style. For example, one might use the transparency value from the shader ([Sample::a]) and set
+/// a cutoff for switching between bold and non-bold text.
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
 pub enum StyleRule {
     ColorFg,
@@ -164,6 +173,8 @@ pub enum StyleRule {
     Map(fn(Sample) -> Style),
 }
 
+/// Primarily used in [`CharacterRule::Map`] and [`StyleRule::Map`], it provides access to a Cells color and position
+/// allowing to map the output of the shader to more complex behaviour.
 pub struct Sample {
     value: [u8; 4],
     position: (u16, u16),
@@ -174,26 +185,32 @@ impl Sample {
         Self { value, position }
     }
 
+    /// The red channel of the [`Sample`]
     pub fn r(&self) -> u8 {
         self.value[0]
     }
 
+    /// The green channel of the [`Sample`]
     pub fn g(&self) -> u8 {
         self.value[1]
     }
 
+    /// The blue channel of the [`Sample`]
     pub fn b(&self) -> u8 {
         self.value[2]
     }
 
+    /// The alpha channel of the [`Sample`]
     pub fn a(&self) -> u8 {
         self.value[3]
     }
 
+    /// The x coordinate of the [`Sample`]
     pub fn x(&self) -> u16 {
         self.position.0
     }
 
+    /// The y coordinate of the [`Sample`]
     pub fn y(&self) -> u16 {
         self.position.1
     }
