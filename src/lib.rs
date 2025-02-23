@@ -42,10 +42,10 @@ use crate::wgpu_context::WgpuContext;
 ///
 /// ```rust,no_run
 /// let mut terminal = ratatui::init();
-/// let mut state = tui_shader::ShaderCanvasState:default();
+/// let mut state = tui_shader::ShaderCanvasState::default();
 /// terminal.draw(|frame| {
-///     frame.render_stateful_widget(ShaderCanvas, frame.area(), &mut state);
-/// }
+///     frame.render_stateful_widget(tui_shader::ShaderCanvas, frame.area(), &mut state);
+/// }).unwrap();
 /// ratatui::restore();
 /// ```
 pub struct ShaderCanvas;
@@ -61,17 +61,18 @@ impl StatefulWidget for ShaderCanvas {
         for y in 0..height {
             for x in 0..width {
                 let index = (y * (width + WgpuContext::row_padding(width)) + x) as usize;
-                let pixel = raw_buffer[index];
+                let value = raw_buffer[index];
+                let position = (x, y);
                 let character = match state.options.character_rule {
                     CharacterRule::Always(character) => character,
-                    CharacterRule::Map(map) => map(pixel.into()),
+                    CharacterRule::Map(map) => map(Sample::new(value, position)),
                 };
-                let color = Color::Rgb(pixel[0], pixel[1], pixel[2]);
+                let color = Color::Rgb(value[0], value[1], value[2]);
                 let style = match state.options.style_rule {
                     StyleRule::ColorFg => Style::new().fg(color),
                     StyleRule::ColorBg => Style::new().bg(color),
                     StyleRule::ColorFgAndBg => Style::new().fg(color).bg(color),
-                    StyleRule::Map(map) => map(pixel.into()),
+                    StyleRule::Map(map) => map(Sample::new(value, position)),
                 };
                 let cell = buf.cell_mut(Position::new(x, y)).unwrap();
                 cell.set_style(style);
@@ -104,8 +105,8 @@ impl ShaderCanvasState {
     /// ```rust,no_run
     /// let state = tui_shader::ShaderCanvasState::new_with_options("path/to/shader.wgsl",
     ///     tui_shader::ShaderCanvasOptions {
-    ///         style_rule: StyleRule::Fg,
-    ///         entry_point: "fragment",
+    ///         style_rule: tui_shader::StyleRule::ColorFg,
+    ///         entry_point: String::from("fragment"),
     ///         ..Default::default()
     ///     }
     /// );
@@ -169,6 +170,10 @@ pub struct Sample {
 }
 
 impl Sample {
+    fn new(value: [u8; 4], position: (u16, u16)) -> Self {
+        Self { value, position }
+    }
+
     pub fn r(&self) -> u8 {
         self.value[0]
     }

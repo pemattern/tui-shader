@@ -1,5 +1,5 @@
 fn main() {
-    let terminal = ratatui::init();
+    let _ = ratatui::init();
 
     ratatui::restore();
 }
