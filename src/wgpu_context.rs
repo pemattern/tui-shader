@@ -24,12 +24,12 @@ pub struct WgpuContext {
 }
 
 impl WgpuContext {
-    pub fn new(path_to_fragment_shader: &str, entry_point: &str) -> Self {
+    pub async fn new(path_to_fragment_shader: &str, entry_point: &str) -> Self {
         let instance = wgpu::Instance::default();
 
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions::default())
-            .block_on()
+            .await
             .unwrap();
 
         let (device, queue) = adapter
@@ -42,7 +42,7 @@ impl WgpuContext {
                 },
                 None,
             )
-            .block_on()
+            .await
             .unwrap();
 
         let vertex_shader =
@@ -188,7 +188,7 @@ impl WgpuContext {
         (bytes_per_row - row_size) / 4
     }
 
-    pub fn execute(&mut self, width: u16, height: u16) -> Vec<[u8; 4]> {
+    pub async fn execute(&mut self, width: u16, height: u16) -> Vec<[u8; 4]> {
         if Self::bytes_per_row(width) != Self::bytes_per_row(self.width) || height != self.height {
             self.texture = Self::create_texture(&self.device, width.into(), height.into());
             self.output_buffer = Self::create_buffer(&self.device, width.into(), height.into());
@@ -259,7 +259,7 @@ impl WgpuContext {
         let (sender, receiver) = flume::bounded(1);
         buffer_slice.map_async(wgpu::MapMode::Read, move |r| sender.send(r).unwrap());
         self.device.poll(wgpu::Maintain::wait()).panic_on_timeout();
-        receiver.recv_async().block_on().unwrap().unwrap();
+        receiver.recv_async().await.unwrap().unwrap();
         let slice: Vec<[u8; 4]>;
         {
             let view = buffer_slice.get_mapped_range();
@@ -272,6 +272,6 @@ impl WgpuContext {
 
 impl Default for WgpuContext {
     fn default() -> Self {
-        Self::new("src/shaders/default_fragment.wgsl", "magenta")
+        Self::new("src/shaders/default_fragment.wgsl", "magenta").block_on()
     }
 }
