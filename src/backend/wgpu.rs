@@ -3,6 +3,8 @@ use std::{fs, time::Instant};
 use pollster::FutureExt as _;
 use wgpu::util::DeviceExt;
 
+use super::TuiShaderBackend;
+
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 struct ShaderInput {
@@ -13,7 +15,7 @@ struct ShaderInput {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct WgpuContext {
+pub struct WgpuBackend {
     device: wgpu::Device,
     queue: wgpu::Queue,
     pipeline: wgpu::RenderPipeline,
@@ -26,11 +28,11 @@ pub struct WgpuContext {
     height: u16,
 }
 
-impl WgpuContext {
+impl WgpuBackend {
     pub fn new(path_to_fragment_shader: &str, entry_point: &str) -> Self {
         Self::new_inner(path_to_fragment_shader, entry_point).block_on()
     }
-    
+
     async fn new_inner(path_to_fragment_shader: &str, entry_point: &str) -> Self {
         let instance = wgpu::Instance::default();
 
@@ -53,7 +55,7 @@ impl WgpuContext {
             .expect("unable to create device and queue from wgpu adapter");
 
         let vertex_shader =
-            device.create_shader_module(wgpu::include_wgsl!("shaders/fullscreen_vertex.wgsl"));
+            device.create_shader_module(wgpu::include_wgsl!("../shaders/fullscreen_vertex.wgsl"));
 
         let fragment_shader_source =
             fs::read_to_string(path_to_fragment_shader).expect("Unable to read fragment shader");
@@ -68,8 +70,8 @@ impl WgpuContext {
         let width = 64u16;
         let height = 64u16;
 
-        let texture = WgpuContext::create_texture(&device, width.into(), height.into());
-        let buffer = WgpuContext::create_buffer(&device, width.into(), height.into());
+        let texture = WgpuBackend::create_texture(&device, width.into(), height.into());
+        let buffer = WgpuBackend::create_buffer(&device, width.into(), height.into());
 
         let shader_input = ShaderInput {
             time: creation_time.elapsed().as_secs_f32(),
@@ -142,7 +144,7 @@ impl WgpuContext {
             cache: None,
         });
 
-        WgpuContext {
+        WgpuBackend {
             device,
             queue,
             pipeline,
@@ -195,10 +197,6 @@ impl WgpuContext {
         let row_size = width * 4;
         let bytes_per_row = Self::bytes_per_row(width);
         (bytes_per_row - row_size) / 4
-    }
-
-    pub fn execute(&mut self, width: u16, height: u16) -> Vec<[u8; 4]> {
-        self.execute_inner(width, height).block_on()
     }
 
     async fn execute_inner(&mut self, width: u16, height: u16) -> Vec<[u8; 4]> {
@@ -295,7 +293,13 @@ impl WgpuContext {
     }
 }
 
-impl Default for WgpuContext {
+impl TuiShaderBackend for WgpuBackend {
+    fn execute(&mut self, width: u16, height: u16) -> Vec<[u8; 4]> {
+        self.execute_inner(width, height).block_on()
+    }
+}
+
+impl Default for WgpuBackend {
     fn default() -> Self {
         Self::new("src/shaders/default_fragment.wgsl", "magenta")
     }

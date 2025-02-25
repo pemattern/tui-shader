@@ -21,19 +21,22 @@
 //! let start_time = std::time::Instant::now();
 //! while start_time.elapsed().as_secs() < 5 {
 //!     terminal.draw(|frame| {
-//!         frame.render_stateful_widget(tui_shader::ShaderCanvas, frame.area(), &mut state);
+//!         frame.render_stateful_widget(tui_shader::ShaderCanvas::new(), frame.area(), &mut state);
 //!     }).unwrap();
 //! }
 //! ratatui::restore();
 //! ```
 
-mod wgpu_context;
+mod backend;
 
+use std::marker::PhantomData;
+
+use backend::TuiShaderBackend;
 use ratatui::layout::{Position, Rect};
 use ratatui::style::{Color, Style};
 use ratatui::widgets::StatefulWidget;
 
-use crate::wgpu_context::WgpuContext;
+use crate::backend::wgpu::WgpuBackend;
 
 /// `ShaderCanvas` is a unit struct which implements the `StatefulWidget` trait from Ratatui.
 /// It holds the logic for applying the result of GPU computation to the `Buffer` struct which
@@ -43,31 +46,86 @@ use crate::wgpu_context::WgpuContext;
 /// let mut terminal = ratatui::init();
 /// let mut state = tui_shader::ShaderCanvasState::default();
 /// terminal.draw(|frame| {
-///     frame.render_stateful_widget(tui_shader::ShaderCanvas, frame.area(), &mut state);
+///     frame.render_stateful_widget(tui_shader::ShaderCanvas::new()
+///         .style_rule(tui_shader::StyleRule::ColorFg),
+///         frame.area(),
+///         &mut state);
 /// }).unwrap();
 /// ratatui::restore();
 /// ```
-pub struct ShaderCanvas;
 
-impl StatefulWidget for ShaderCanvas {
-    type State = ShaderCanvasState;
-    fn render(self, area: Rect, buf: &mut ratatui::buffer::Buffer, state: &mut Self::State) {
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct ShaderCanvas<T> {
+    pub character_rule: CharacterRule,
+    pub style_rule: StyleRule,
+    pub entry_point: String,
+    _marker: PhantomData<T>,
+}
+
+impl<T: TuiShaderBackend> ShaderCanvas<T> {
+    /// Creates a new instance of [`ShaderCanvas`].
+    pub fn new() -> Self {
+        Self {
+            character_rule: CharacterRule::default(),
+            style_rule: StyleRule::default(),
+            entry_point: String::from("main"),
+            _marker: PhantomData,
+        }
+    }
+
+    /// Applies a [`CharacterRule`] to a [`ShaderCanvas`].
+    #[must_use]
+    pub fn character_rule(mut self, character_rule: CharacterRule) -> Self {
+        self.character_rule = character_rule;
+        self
+    }
+
+    /// Applies a [`StyleRule`] to a [`ShaderCanvas`].
+    #[must_use]
+    pub fn style_rule(mut self, style_rule: StyleRule) -> Self {
+        self.style_rule = style_rule;
+        self
+    }
+
+    /// Sets the entry point of the fragment shader in the [`ShaderCanvas`].
+    /// The default value is "main".
+    #[must_use]
+    pub fn entry_point(mut self, entry_point: &str) -> Self {
+        self.entry_point = String::from(entry_point);
+        self
+    }
+}
+
+impl<T: TuiShaderBackend> Default for ShaderCanvas<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<T: TuiShaderBackend> StatefulWidget for ShaderCanvas<T> {
+    type State = ShaderCanvasState<T>;
+    fn render(
+        self,
+        area: Rect,
+        buf: &mut ratatui::buffer::Buffer,
+        state: &mut ShaderCanvasState<T>,
+    ) {
         let width = area.width;
         let height = area.height;
 
-        let raw_buffer = state.wgpu_context.execute(width, height);
+        let raw_buffer = state.backend.execute(width, height);
 
         for y in 0..height {
             for x in 0..width {
-                let index = (y * (width + WgpuContext::row_padding(width)) + x) as usize;
+                let index = (y * (width + WgpuBackend::row_padding(width)) + x) as usize;
                 let value = raw_buffer[index];
                 let position = (x, y);
-                let character = match state.options.character_rule {
+                let character = match self.character_rule {
                     CharacterRule::Always(character) => character,
                     CharacterRule::Map(map) => map(Sample::new(value, position)),
                 };
                 let color = Color::Rgb(value[0], value[1], value[2]);
-                let style = match state.options.style_rule {
+                let style = match self.style_rule {
                     StyleRule::ColorFg => Style::new().fg(color),
                     StyleRule::ColorBg => Style::new().bg(color),
                     StyleRule::ColorFgAndBg => Style::new().fg(color).bg(color),
@@ -83,57 +141,36 @@ impl StatefulWidget for ShaderCanvas {
     }
 }
 
-/// State struct for [`ShaderCanvas`].
-///
-/// This struct holds values that may want to be altered at runtime.
-#[derive(Debug, Default, Clone, Eq, PartialEq)]
-pub struct ShaderCanvasState {
-    wgpu_context: WgpuContext,
-    options: ShaderCanvasOptions,
-}
-
-impl ShaderCanvasState {
-    /// Creates a new [`ShaderCanvasState`] by passing in the path to the desired fragment shader.
-    /// The shader must be written in WGSL. The [`ShaderCanvasOptions`] will be set to
-    /// [`Self::default()`].
-    pub fn new(path_to_fragment_shader: &str) -> Self {
-        Self::new_with_options(path_to_fragment_shader, ShaderCanvasOptions::default())
-    }
-
-    /// Creates a new [`ShaderCanvasState`] by passing in the path to the desired fragment shader.
-    /// The shader must be written in WGSL. The [`ShaderCanvasOptions`] can be customized.
-    ///
-    /// ```rust,no_run
-    /// let state = tui_shader::ShaderCanvasState::new_with_options("path/to/shader.wgsl",
-    ///     tui_shader::ShaderCanvasOptions {
-    ///         style_rule: tui_shader::StyleRule::ColorFg,
-    ///         entry_point: String::from("fragment"),
-    ///         ..Default::default()
-    ///     }
-    /// );
-    /// ```
-    pub fn new_with_options(path_to_fragment_shader: &str, options: ShaderCanvasOptions) -> Self {
-        Self {
-            wgpu_context: WgpuContext::new(path_to_fragment_shader, &options.entry_point),
-            options,
-        }
-    }
-}
-
-/// Contains options to customize the behaviour of the ShaderCanvas.
+/// State struct for [`ShaderCanvas`], it holds the [`TuiShaderBackend`].
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct ShaderCanvasOptions {
-    pub character_rule: CharacterRule,
-    pub style_rule: StyleRule,
-    pub entry_point: String,
+pub struct ShaderCanvasState<T: TuiShaderBackend> {
+    backend: T,
 }
 
-impl Default for ShaderCanvasOptions {
-    fn default() -> Self {
+impl ShaderCanvasState<WgpuBackend> {
+    /// Creates a new [`ShaderCanvasState`] using [`WgpuBackend`] as it's
+    /// [`TuiShaderBackend`].
+    pub fn wgpu(
+        path_to_fragment_shader: &str,
+        entry_point: &str,
+    ) -> ShaderCanvasState<WgpuBackend> {
+        let backend = WgpuBackend::new(path_to_fragment_shader, entry_point);
+        ShaderCanvasState { backend }
+    }
+}
+
+impl<T: TuiShaderBackend> ShaderCanvasState<T> {
+    /// Creates a new [`ShaderCanvasState`] instance by passing in the desired [`TuiShaderBackend`].
+    pub fn new(backend: T) -> ShaderCanvasState<T> {
+        ShaderCanvasState { backend }
+    }
+}
+
+impl Default for ShaderCanvasState<WgpuBackend> {
+    /// Creates a new [`ShaderCanvasState`] instance with a [`WgpuBackend`].
+    fn default() -> ShaderCanvasState<WgpuBackend> {
         Self {
-            character_rule: CharacterRule::default(),
-            style_rule: StyleRule::default(),
-            entry_point: String::from("main"),
+            backend: WgpuBackend::default(),
         }
     }
 }
@@ -224,14 +261,14 @@ mod tests {
 
     #[test]
     fn default_wgsl_context() {
-        let mut context = WgpuContext::default();
+        let mut context = WgpuBackend::default();
         let raw_buffer = context.execute(64, 64);
         assert!(raw_buffer.iter().all(|pixel| pixel == &[255, 0, 255, 255]));
     }
 
     #[test]
     fn different_entry_points() {
-        let mut context = WgpuContext::new("src/shaders/default_fragment.wgsl", "green");
+        let mut context = WgpuBackend::new("src/shaders/default_fragment.wgsl", "green");
         let raw_buffer = context.execute(64, 64);
         assert!(raw_buffer.iter().all(|pixel| pixel == &[0, 255, 0, 255]));
     }
@@ -240,11 +277,19 @@ mod tests {
     fn character_rule_map() {
         let mut terminal = ratatui::Terminal::new(TestBackend::new(64, 64)).unwrap();
         let mut state = ShaderCanvasState::default();
-        state.options.character_rule =
-            CharacterRule::Map(|sample| if sample.x() == 0 { ' ' } else { '.' });
         terminal
             .draw(|frame| {
-                frame.render_stateful_widget(ShaderCanvas, frame.area(), &mut state);
+                frame.render_stateful_widget(
+                    ShaderCanvas::new().character_rule(CharacterRule::Map(|sample| {
+                        if sample.x() == 0 {
+                            ' '
+                        } else {
+                            '.'
+                        }
+                    })),
+                    frame.area(),
+                    &mut state,
+                );
                 let buffer = frame.buffer_mut();
                 for x in 0..buffer.area.width {
                     for y in 0..buffer.area.height {
