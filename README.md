@@ -11,7 +11,9 @@
 
 ## Examples
 
-![Example](https://github.com/pemattern/tui-shader/blob/main/assets/pipe-into.gif)
+<p align="center">
+  <a href="https://github.com/pemattern/tui-shader"><img src="assets/pipe-into.gif" width="880"></a>
+</p>
 
 For the sake of simplicity, all examples run for a few seconds, and then quit.
 To run examples use the following command:

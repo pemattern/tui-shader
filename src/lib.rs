@@ -218,6 +218,8 @@ impl Sample {
 
 #[cfg(test)]
 mod tests {
+    use ratatui::backend::TestBackend;
+
     use super::*;
 
     #[test]
@@ -225,5 +227,36 @@ mod tests {
         let mut context = WgpuContext::default();
         let raw_buffer = context.execute(64, 64).block_on();
         assert!(raw_buffer.iter().all(|pixel| pixel == &[255, 0, 255, 255]));
+    }
+
+    #[test]
+    fn different_entry_points() {
+        let mut context = WgpuContext::new("src/shaders/default_fragment.wgsl", "green").block_on();
+        let raw_buffer = context.execute(64, 64).block_on();
+        assert!(raw_buffer.iter().all(|pixel| pixel == &[0, 255, 0, 255]));
+    }
+
+    #[test]
+    fn character_rule_map() {
+        let mut terminal = ratatui::Terminal::new(TestBackend::new(64, 64)).unwrap();
+        let mut state = ShaderCanvasState::default();
+        state.options.character_rule =
+            CharacterRule::Map(|sample| if sample.x() == 0 { ' ' } else { '.' });
+        terminal
+            .draw(|frame| {
+                frame.render_stateful_widget(ShaderCanvas, frame.area(), &mut state);
+                let buffer = frame.buffer_mut();
+                for x in 0..buffer.area.width {
+                    for y in 0..buffer.area.height {
+                        if x == 0 {
+                            assert_eq!(buffer.cell_mut(Position::new(x, y)).unwrap().symbol(), " ");
+                        } else {
+                            assert_eq!(buffer.cell_mut(Position::new(x, y)).unwrap().symbol(), ".");
+                        }
+                    }
+                }
+            })
+            .unwrap();
+        ratatui::restore();
     }
 }
