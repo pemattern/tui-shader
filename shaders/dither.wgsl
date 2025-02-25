@@ -84,6 +84,34 @@ fn simplex_3(v: vec3<f32>) -> f32 {
     return 42. * dot(m * m, vec4(dot(p0, x0), dot(p1, x1), dot(p2, x2), dot(p3, x3)));
 }
 
+const SOBEL_X: array<array<f32, 3>, 3> = array(
+    array( 1.0, 0.0, -1.0 ),
+    array( 2.0, 0.0, -2.0 ),
+    array( 1.0, 0.0, -1.0 ),
+);
+
+
+const SOBEL_Y: array<array<f32, 3>, 3> = array(
+    array(  1.0,  2.0,  1.0 ),
+    array(  0.0,  0.0,  0.0 ),
+    array( -1.0, -2.0, -1.0 ),
+);
+
+fn sobel(pixel_position: vec2<f32>) -> f32 {
+    var sum_x = f32(0.0);
+    var sum_y = f32(0.0);
+    for (var x: i32; x <= 1; x++) {
+        for (var y: i32; y <= 1; y ++) {
+            let uv = (pixel_position + vec2<f32>(f32(x), f32(y))) / input.resolution;
+            let sample = simplex_3(vec3<f32>(uv.x * 2.0, uv.y * 2.0, input.time * 0.35));
+            sum_x = sum_x + sample * SOBEL_X[x + 1][y + 1];
+            sum_y = sum_y + sample * SOBEL_Y[x + 1][y + 1];
+        }
+    }
+    let result = sqrt(sum_x * sum_x + sum_y * sum_y);
+    return 1.0 - result;
+}
+
 const BAYER_8X8: array<array<f32, 8>, 8> = array(
     array(0.0,      0.5,      0.125,    0.625,    0.03125,  0.53125,  0.15625,  0.65625 ),
     array(0.75,     0.25,     0.875,    0.375,    0.78125,  0.28125,  0.90625,  0.40625 ),
@@ -95,14 +123,27 @@ const BAYER_8X8: array<array<f32, 8>, 8> = array(
     array(0.984375, 0.484375, 0.953125, 0.453125, 0.828125, 0.328125, 0.859375, 0.359375),
 );
 
+const margin: f32 = 0.2;
+const dark_color = vec4<f32>(0.294, 0.278, 0.361, 1.0);
+const light_color = vec4<f32>(0.843, 0.871, 0.863, 1.0);
+
 @fragment
 fn main(@location(0) uv: vec2<f32>, @builtin(position) position: vec4<f32>) -> @location(0) vec4<f32> {
     let noise = simplex_3(vec3<f32>(uv.x * 2.0, uv.y * 2.0, input.time * 0.35));
-    let dither = BAYER_8X8[u32(position.x) % 8][u32(position.y) % 8];
 
-    if noise < dither {
-        return vec4<f32>(0.294, 0.278, 0.361, 1.0);
+    if uv.x < margin || uv.x > (1.0 - margin) || uv.y < (margin) || uv.y > (1.0 - margin) {
+        let dither = BAYER_8X8[u32(position.x) % 8][u32(position.y) % 8];
+        if (noise * 2.0) < dither {
+            return dark_color;
+        } else {
+            return light_color;
+        }
     } else {
-        return vec4<f32>(0.843, 0.871, 0.863, 1.0);
+        let sobel = sobel(position.xy);
+        if sobel > 0.5 {
+            return dark_color;
+        } else {
+            return light_color;
+        }
     }
 }
