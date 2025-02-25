@@ -1,5 +1,3 @@
-use ratatui::style::Stylize;
-
 const DARK_COLOR: ratatui::style::Color = ratatui::style::Color::Rgb(75, 71, 92);
 const LIGHT_COLOR: ratatui::style::Color = ratatui::style::Color::Rgb(215, 222, 220);
 

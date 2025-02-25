@@ -20,14 +20,18 @@ pub struct WgpuContext {
     creation_time: Instant,
     texture: wgpu::Texture,
     output_buffer: wgpu::Buffer,
-    pub width: u16,
-    pub height: u16,
     shader_input_buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
+    width: u16,
+    height: u16,
 }
 
 impl WgpuContext {
-    pub async fn new(path_to_fragment_shader: &str, entry_point: &str) -> Self {
+    pub fn new(path_to_fragment_shader: &str, entry_point: &str) -> Self {
+        Self::new_inner(path_to_fragment_shader, entry_point).block_on()
+    }
+    
+    async fn new_inner(path_to_fragment_shader: &str, entry_point: &str) -> Self {
         let instance = wgpu::Instance::default();
 
         let adapter = instance
@@ -193,7 +197,11 @@ impl WgpuContext {
         (bytes_per_row - row_size) / 4
     }
 
-    pub async fn execute(&mut self, width: u16, height: u16) -> Vec<[u8; 4]> {
+    pub fn execute(&mut self, width: u16, height: u16) -> Vec<[u8; 4]> {
+        self.execute_inner(width, height).block_on()
+    }
+
+    async fn execute_inner(&mut self, width: u16, height: u16) -> Vec<[u8; 4]> {
         if Self::bytes_per_row(width) != Self::bytes_per_row(self.width) || height != self.height {
             self.texture = Self::create_texture(&self.device, width.into(), height.into());
             self.output_buffer = Self::create_buffer(&self.device, width.into(), height.into());
@@ -289,6 +297,6 @@ impl WgpuContext {
 
 impl Default for WgpuContext {
     fn default() -> Self {
-        Self::new("src/shaders/default_fragment.wgsl", "magenta").block_on()
+        Self::new("src/shaders/default_fragment.wgsl", "magenta")
     }
 }

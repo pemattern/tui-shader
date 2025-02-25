@@ -29,7 +29,6 @@
 
 mod wgpu_context;
 
-use pollster::FutureExt;
 use ratatui::layout::{Position, Rect};
 use ratatui::style::{Color, Style};
 use ratatui::widgets::StatefulWidget;
@@ -56,7 +55,7 @@ impl StatefulWidget for ShaderCanvas {
         let width = area.width;
         let height = area.height;
 
-        let raw_buffer = state.wgpu_context.execute(width, height).block_on();
+        let raw_buffer = state.wgpu_context.execute(width, height);
 
         for y in 0..height {
             for x in 0..width {
@@ -115,8 +114,7 @@ impl ShaderCanvasState {
     /// ```
     pub fn new_with_options(path_to_fragment_shader: &str, options: ShaderCanvasOptions) -> Self {
         Self {
-            wgpu_context: WgpuContext::new(path_to_fragment_shader, &options.entry_point)
-                .block_on(),
+            wgpu_context: WgpuContext::new(path_to_fragment_shader, &options.entry_point),
             options,
         }
     }
@@ -227,14 +225,14 @@ mod tests {
     #[test]
     fn default_wgsl_context() {
         let mut context = WgpuContext::default();
-        let raw_buffer = context.execute(64, 64).block_on();
+        let raw_buffer = context.execute(64, 64);
         assert!(raw_buffer.iter().all(|pixel| pixel == &[255, 0, 255, 255]));
     }
 
     #[test]
     fn different_entry_points() {
-        let mut context = WgpuContext::new("src/shaders/default_fragment.wgsl", "green").block_on();
-        let raw_buffer = context.execute(64, 64).block_on();
+        let mut context = WgpuContext::new("src/shaders/default_fragment.wgsl", "green");
+        let raw_buffer = context.execute(64, 64);
         assert!(raw_buffer.iter().all(|pixel| pixel == &[0, 255, 0, 255]));
     }
 
