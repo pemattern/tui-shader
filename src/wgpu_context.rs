@@ -33,7 +33,7 @@ impl WgpuContext {
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions::default())
             .await
-            .unwrap();
+            .expect("unable to create adapter from wgpu instance");
 
         let (device, queue) = adapter
             .request_device(
@@ -46,7 +46,7 @@ impl WgpuContext {
                 None,
             )
             .await
-            .unwrap();
+            .expect("unable to create device and queue from wgpu adapter");
 
         let vertex_shader =
             device.create_shader_module(wgpu::include_wgsl!("shaders/fullscreen_vertex.wgsl"));
@@ -266,9 +266,17 @@ impl WgpuContext {
 
         let buffer_slice = self.output_buffer.slice(..);
         let (sender, receiver) = flume::bounded(1);
-        buffer_slice.map_async(wgpu::MapMode::Read, move |r| sender.send(r).unwrap());
+        buffer_slice.map_async(wgpu::MapMode::Read, move |r| {
+            sender
+                .send(r)
+                .expect("unable to send buffer slice data to receiver");
+        });
         self.device.poll(wgpu::Maintain::wait()).panic_on_timeout();
-        receiver.recv_async().await.unwrap().unwrap();
+        receiver
+            .recv_async()
+            .await
+            .expect("unable to receive message all senders have been dropped")
+            .expect("on unexpected error occured");
         let slice: Vec<[u8; 4]>;
         {
             let view = buffer_slice.get_mapped_range();

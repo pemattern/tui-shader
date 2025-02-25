@@ -74,7 +74,9 @@ impl StatefulWidget for ShaderCanvas {
                     StyleRule::ColorFgAndBg => Style::new().fg(color).bg(color),
                     StyleRule::Map(map) => map(Sample::new(value, position)),
                 };
-                let cell = buf.cell_mut(Position::new(x, y)).unwrap();
+                let cell = buf
+                    .cell_mut(Position::new(x, y))
+                    .expect("unable to get cell");
                 cell.set_style(style);
                 cell.set_char(character);
             }
