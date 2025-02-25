@@ -1,12 +1,12 @@
-![Header](https://github.com/pemattern/tui-shader/blob/main/assets/demo.gif)
+<p align="center">
+  <a href="https://github.com/pemattern/tui-shader"><img src="assets/demo.gif" width="720"></a>
+</p>
 
 ## What is tui-shader?
 
 `tui-shader` provides the `ShaderCanvas` `StatefulWidget` for the `ratatui` crate allowing us to harness the power of GPU shaders to make our terminals a more beautiful place.
 
-> [!WARNING]
->
->
+> **Warning**
 > This crate is still very early in development, please expect: bugs, major breaking changes, lack of documentation, poor API design, lots of other terrible things.  
 
 ## Examples
