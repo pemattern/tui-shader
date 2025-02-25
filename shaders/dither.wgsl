@@ -123,7 +123,7 @@ const BAYER_8X8: array<array<f32, 8>, 8> = array(
     array(0.984375, 0.484375, 0.953125, 0.453125, 0.828125, 0.328125, 0.859375, 0.359375),
 );
 
-const margin: f32 = 0.2;
+const margin: f32 = 0.15;
 const dark_color = vec4<f32>(0.294, 0.278, 0.361, 1.0);
 const light_color = vec4<f32>(0.843, 0.871, 0.863, 1.0);
 

@@ -23,6 +23,7 @@ ratatui = "0.29.0"
 
 [dev-dependencies]
 rand = "0.9.0"
+tui-big-text = "0.7.1"
 
 [[example]]
 name = "demo"

@@ -1,4 +1,4 @@
-![Header](https://github.com/pemattern/tui-shader/blob/main/assets/stylize-other-widget.gif)
+![Header](https://github.com/pemattern/tui-shader/blob/main/assets/demo.gif)
 
 ## What is tui-shader?
 
