@@ -31,7 +31,7 @@ mod backend;
 
 use std::marker::PhantomData;
 
-use backend::TuiShaderBackend;
+use backend::{NoUserData, TuiShaderBackend};
 use ratatui::layout::{Position, Rect};
 use ratatui::style::{Color, Style};
 use ratatui::widgets::StatefulWidget;
@@ -55,21 +55,23 @@ use crate::backend::wgpu::WgpuBackend;
 /// ```
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct ShaderCanvas<T> {
+pub struct ShaderCanvas<B, T> {
     pub character_rule: CharacterRule,
     pub style_rule: StyleRule,
     pub entry_point: String,
-    _marker: PhantomData<T>,
+    _backend: PhantomData<B>,
+    _user_data: PhantomData<T>,
 }
 
-impl<T: TuiShaderBackend> ShaderCanvas<T> {
+impl<T, B: TuiShaderBackend<T>> ShaderCanvas<B, T> {
     /// Creates a new instance of [`ShaderCanvas`].
     pub fn new() -> Self {
         Self {
             character_rule: CharacterRule::default(),
             style_rule: StyleRule::default(),
             entry_point: String::from("main"),
-            _marker: PhantomData,
+            _backend: PhantomData,
+            _user_data: PhantomData,
         }
     }
 
@@ -96,29 +98,28 @@ impl<T: TuiShaderBackend> ShaderCanvas<T> {
     }
 }
 
-impl<T: TuiShaderBackend> Default for ShaderCanvas<T> {
+impl<T, B: TuiShaderBackend<T>> Default for ShaderCanvas<B, T> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<T: TuiShaderBackend> StatefulWidget for ShaderCanvas<T> {
-    type State = ShaderCanvasState<T>;
+impl<T, B: TuiShaderBackend<T>> StatefulWidget for ShaderCanvas<B, T> {
+    type State = ShaderCanvasState<T, B>;
     fn render(
         self,
         area: Rect,
         buf: &mut ratatui::buffer::Buffer,
-        state: &mut ShaderCanvasState<T>,
+        state: &mut ShaderCanvasState<T, B>,
     ) {
         let width = area.width;
         let height = area.height;
-
-        let raw_buffer = state.backend.execute(width, height);
+        let samples = state.backend.execute(width, height);
 
         for y in 0..height {
             for x in 0..width {
-                let index = (y * (width + WgpuBackend::row_padding(width)) + x) as usize;
-                let value = raw_buffer[index];
+                let index = (y * width + x) as usize;
+                let value = samples[index];
                 let position = (x, y);
                 let character = match self.character_rule {
                     CharacterRule::Always(character) => character,
@@ -143,34 +144,50 @@ impl<T: TuiShaderBackend> StatefulWidget for ShaderCanvas<T> {
 
 /// State struct for [`ShaderCanvas`], it holds the [`TuiShaderBackend`].
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct ShaderCanvasState<T: TuiShaderBackend> {
-    backend: T,
+pub struct ShaderCanvasState<T, B: TuiShaderBackend<T>> {
+    backend: B,
+    _user_data: PhantomData<T>,
 }
 
-impl ShaderCanvasState<WgpuBackend> {
+impl ShaderCanvasState<NoUserData, WgpuBackend<NoUserData>> {
     /// Creates a new [`ShaderCanvasState`] using [`WgpuBackend`] as it's
     /// [`TuiShaderBackend`].
     pub fn wgpu(
         path_to_fragment_shader: &str,
         entry_point: &str,
-    ) -> ShaderCanvasState<WgpuBackend> {
+    ) -> ShaderCanvasState<NoUserData, WgpuBackend<NoUserData>> {
         let backend = WgpuBackend::new(path_to_fragment_shader, entry_point);
-        ShaderCanvasState { backend }
+        ShaderCanvasState {
+            backend,
+            _user_data: PhantomData,
+        }
     }
 }
 
-impl<T: TuiShaderBackend> ShaderCanvasState<T> {
+impl<T, B: TuiShaderBackend<T>> ShaderCanvasState<T, B> {
     /// Creates a new [`ShaderCanvasState`] instance by passing in the desired [`TuiShaderBackend`].
-    pub fn new(backend: T) -> ShaderCanvasState<T> {
-        ShaderCanvasState { backend }
+    pub fn new(backend: B) -> ShaderCanvasState<T, B> {
+        ShaderCanvasState {
+            backend,
+            _user_data: PhantomData,
+        }
     }
 }
 
-impl Default for ShaderCanvasState<WgpuBackend> {
+impl<T, B: TuiShaderBackend<T>> ShaderCanvasState<T, B> {
+    /// Creates a new [`ShaderCanvasState`] instance by passing in the desired [`TuiShaderBackend`].
+    pub fn with_user_data(mut self, user_data: T) -> ShaderCanvasState<T, B> {
+        self.backend.set_user_data(user_data);
+        self
+    }
+}
+
+impl Default for ShaderCanvasState<NoUserData, WgpuBackend<NoUserData>> {
     /// Creates a new [`ShaderCanvasState`] instance with a [`WgpuBackend`].
-    fn default() -> ShaderCanvasState<WgpuBackend> {
+    fn default() -> ShaderCanvasState<NoUserData, WgpuBackend<NoUserData>> {
         Self {
             backend: WgpuBackend::default(),
+            _user_data: PhantomData,
         }
     }
 }
