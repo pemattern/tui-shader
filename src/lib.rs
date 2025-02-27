@@ -154,14 +154,14 @@ impl ShaderCanvasState<NoUserData> {
         let backend = Box::new(WgpuBackend::new(path_to_fragment_shader, entry_point));
         Self {
             backend,
-            user_data: NoUserData,
+            user_data: NoUserData::default(),
         }
     }
 }
 
 impl<T> ShaderCanvasState<T>
 where
-    T: Copy + bytemuck::Pod + bytemuck::Zeroable,
+    T: Copy + Default + bytemuck::Pod + bytemuck::Zeroable,
 {
     pub fn wgpu_with_user_data(
         path_to_fragment_shader: &str,
@@ -181,7 +181,7 @@ impl ShaderCanvasState<NoUserData> {
         let backend = Box::new(CpuBackend::new(callback));
         Self {
             backend,
-            user_data: NoUserData,
+            user_data: NoUserData::default(),
         }
     }
 }
@@ -204,7 +204,7 @@ impl Default for ShaderCanvasState<NoUserData> {
     fn default() -> Self {
         Self {
             backend: Box::new(WgpuBackend::default()),
-            user_data: NoUserData,
+            user_data: NoUserData::default(),
         }
     }
 }
@@ -296,14 +296,14 @@ mod tests {
     #[test]
     fn default_wgsl_context() {
         let mut context = WgpuBackend::default();
-        let raw_buffer = context.execute(64, 64, &NoUserData);
+        let raw_buffer = context.execute(64, 64, &NoUserData::default());
         assert!(raw_buffer.iter().all(|pixel| pixel == &[255, 0, 255, 255]));
     }
 
     #[test]
     fn different_entry_points() {
         let mut context = WgpuBackend::new("src/shaders/default_fragment.wgsl", "green");
-        let raw_buffer = context.execute(64, 64, &NoUserData);
+        let raw_buffer = context.execute(64, 64, &NoUserData::default());
         assert!(raw_buffer.iter().all(|pixel| pixel == &[0, 255, 0, 255]));
     }
 

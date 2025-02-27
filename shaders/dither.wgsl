@@ -1,4 +1,3 @@
-
 struct FragmentInput {
     time: f32,
     padding: f32,
