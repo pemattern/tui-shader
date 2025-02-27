@@ -1,12 +1,12 @@
-use std::{fs, time::Instant};
+use std::{fs, marker::PhantomData, time::Instant};
 
 use pollster::FutureExt as _;
 use wgpu::util::DeviceExt;
 
-use super::TuiShaderBackend;
+use super::{NoUserData, TuiShaderBackend};
 
 #[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 struct ShaderInput {
     // struct field order matters
     time: f32,
@@ -15,7 +15,10 @@ struct ShaderInput {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct WgpuBackend {
+pub struct WgpuBackend<T>
+where
+    T: Copy + Clone + bytemuck::Pod + bytemuck::Zeroable,
+{
     device: wgpu::Device,
     queue: wgpu::Queue,
     pipeline: wgpu::RenderPipeline,
@@ -26,9 +29,13 @@ pub struct WgpuBackend {
     bind_group: wgpu::BindGroup,
     width: u16,
     height: u16,
+    _user_data: PhantomData<T>,
 }
 
-impl WgpuBackend {
+impl<T> WgpuBackend<T>
+where
+    T: Copy + Clone + bytemuck::Pod + bytemuck::Zeroable,
+{
     pub fn new(path_to_fragment_shader: &str, entry_point: &str) -> Self {
         Self::new_inner(path_to_fragment_shader, entry_point).block_on()
     }
@@ -70,8 +77,8 @@ impl WgpuBackend {
         let width = 64u16;
         let height = 64u16;
 
-        let texture = WgpuBackend::create_texture(&device, width.into(), height.into());
-        let buffer = WgpuBackend::create_buffer(&device, width.into(), height.into());
+        let texture = WgpuBackend::<T>::create_texture(&device, width.into(), height.into());
+        let output_buffer = WgpuBackend::<T>::create_buffer(&device, width.into(), height.into());
 
         let shader_input = ShaderInput {
             time: creation_time.elapsed().as_secs_f32(),
@@ -150,11 +157,12 @@ impl WgpuBackend {
             pipeline,
             creation_time,
             texture,
-            output_buffer: buffer,
-            width,
-            height,
+            output_buffer,
             shader_input_buffer,
             bind_group,
+            width,
+            height,
+            _user_data: PhantomData,
         }
     }
 
@@ -188,24 +196,23 @@ impl WgpuBackend {
         })
     }
 
-    fn bytes_per_row(width: u16) -> u16 {
+    fn bytes_per_row(&self, width: u16) -> u16 {
         let row_size = width * 4;
         (row_size + 255) & !255
     }
 
-    pub fn row_padding(width: u16) -> u16 {
+    fn row_padding(&self, width: u16) -> u16 {
         let row_size = width * 4;
-        let bytes_per_row = Self::bytes_per_row(width);
+        let bytes_per_row = self.bytes_per_row(width);
         (bytes_per_row - row_size) / 4
     }
 
-    async fn execute_inner(&mut self, width: u16, height: u16) -> Vec<[u8; 4]> {
-        if Self::bytes_per_row(width) != Self::bytes_per_row(self.width) || height != self.height {
+    async fn execute_inner(&mut self, width: u16, height: u16, _user_data: &T) -> Vec<[u8; 4]> {
+        if self.bytes_per_row(width) != self.bytes_per_row(self.width) || height != self.height {
             self.texture = Self::create_texture(&self.device, width.into(), height.into());
             self.output_buffer = Self::create_buffer(&self.device, width.into(), height.into());
         }
-
-        let bytes_per_row = Self::bytes_per_row(width);
+        let bytes_per_row = self.bytes_per_row(width);
 
         let texture_view = self
             .texture
@@ -283,23 +290,34 @@ impl WgpuBackend {
             .await
             .expect("unable to receive message all senders have been dropped")
             .expect("on unexpected error occured");
-        let slice: Vec<[u8; 4]>;
+        let padded_buffer: Vec<[u8; 4]>;
         {
             let view = buffer_slice.get_mapped_range();
-            slice = bytemuck::cast_slice(&view).to_vec();
+            padded_buffer = bytemuck::cast_slice(&view).to_vec();
         }
         self.output_buffer.unmap();
-        slice
+        let mut buffer: Vec<[u8; 4]> = Vec::new();
+        for y in 0..height {
+            for x in 0..width {
+                let index = (y * (width + self.row_padding(width)) + x) as usize;
+                let pixel = padded_buffer[index];
+                buffer.push(pixel);
+            }
+        }
+        buffer
     }
 }
 
-impl TuiShaderBackend for WgpuBackend {
-    fn execute(&mut self, width: u16, height: u16) -> Vec<[u8; 4]> {
-        self.execute_inner(width, height).block_on()
+impl<T> TuiShaderBackend<T> for WgpuBackend<T>
+where
+    T: Copy + Clone + bytemuck::Pod + bytemuck::Zeroable,
+{
+    fn execute(&mut self, width: u16, height: u16, user_data: &T) -> Vec<[u8; 4]> {
+        self.execute_inner(width, height, user_data).block_on()
     }
 }
 
-impl Default for WgpuBackend {
+impl Default for WgpuBackend<NoUserData> {
     fn default() -> Self {
         Self::new("src/shaders/default_fragment.wgsl", "magenta")
     }
