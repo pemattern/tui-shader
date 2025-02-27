@@ -3,7 +3,7 @@ use std::{fs, time::Instant};
 use pollster::FutureExt as _;
 use wgpu::util::DeviceExt;
 
-use super::{NoUserData, TuiShaderBackend};
+use super::TuiShaderBackend;
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
@@ -15,7 +15,7 @@ struct ShaderInput {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct WgpuBackend<T> {
+pub struct WgpuBackend {
     device: wgpu::Device,
     queue: wgpu::Queue,
     pipeline: wgpu::RenderPipeline,
@@ -26,27 +26,14 @@ pub struct WgpuBackend<T> {
     bind_group: wgpu::BindGroup,
     width: u16,
     height: u16,
-    user_data: T,
 }
 
-impl WgpuBackend<NoUserData> {
+impl WgpuBackend {
     pub fn new(path_to_fragment_shader: &str, entry_point: &str) -> Self {
-        Self::new_inner(path_to_fragment_shader, entry_point, NoUserData).block_on()
+        Self::new_inner(path_to_fragment_shader, entry_point).block_on()
     }
-}
 
-impl<T> WgpuBackend<T> {
-    pub fn new_with_user_data(
-        path_to_fragment_shader: &str,
-        entry_point: &str,
-        user_data: T,
-    ) -> Self {
-        Self::new_inner(path_to_fragment_shader, entry_point, user_data).block_on()
-    }
-}
-
-impl<T> WgpuBackend<T> {
-    async fn new_inner(path_to_fragment_shader: &str, entry_point: &str, user_data: T) -> Self {
+    async fn new_inner(path_to_fragment_shader: &str, entry_point: &str) -> Self {
         let instance = wgpu::Instance::default();
 
         let adapter = instance
@@ -83,8 +70,8 @@ impl<T> WgpuBackend<T> {
         let width = 64u16;
         let height = 64u16;
 
-        let texture = WgpuBackend::<T>::create_texture(&device, width.into(), height.into());
-        let output_buffer = WgpuBackend::<T>::create_buffer(&device, width.into(), height.into());
+        let texture = WgpuBackend::create_texture(&device, width.into(), height.into());
+        let output_buffer = WgpuBackend::create_buffer(&device, width.into(), height.into());
 
         let shader_input = ShaderInput {
             time: creation_time.elapsed().as_secs_f32(),
@@ -168,7 +155,6 @@ impl<T> WgpuBackend<T> {
             bind_group,
             width,
             height,
-            user_data,
         }
     }
 
@@ -213,7 +199,12 @@ impl<T> WgpuBackend<T> {
         (bytes_per_row - row_size) / 4
     }
 
-    async fn execute_inner(&mut self, width: u16, height: u16) -> Vec<[u8; 4]> {
+    async fn execute_inner<T>(
+        &mut self,
+        width: u16,
+        height: u16,
+        user_data: Option<T>,
+    ) -> Vec<[u8; 4]> {
         if self.bytes_per_row(width) != self.bytes_per_row(self.width) || height != self.height {
             self.texture = Self::create_texture(&self.device, width.into(), height.into());
             self.output_buffer = Self::create_buffer(&self.device, width.into(), height.into());
@@ -314,17 +305,13 @@ impl<T> WgpuBackend<T> {
     }
 }
 
-impl<T: Eq> TuiShaderBackend<T> for WgpuBackend<T> {
-    fn execute(&mut self, width: u16, height: u16) -> Vec<[u8; 4]> {
-        self.execute_inner(width, height).block_on()
-    }
-
-    fn set_user_data(&mut self, user_data: T) {
-        self.user_data = user_data;
+impl TuiShaderBackend for WgpuBackend {
+    fn execute<T>(&mut self, width: u16, height: u16, user_data: Option<T>) -> Vec<[u8; 4]> {
+        self.execute_inner(width, height, user_data).block_on()
     }
 }
 
-impl Default for WgpuBackend<NoUserData> {
+impl Default for WgpuBackend {
     fn default() -> Self {
         Self::new("src/shaders/default_fragment.wgsl", "magenta")
     }

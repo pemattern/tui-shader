@@ -55,7 +55,11 @@ use crate::backend::wgpu::WgpuBackend;
 /// ```
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct ShaderCanvas<B, T> {
+pub struct ShaderCanvas<B, T>
+where
+    B: TuiShaderBackend,
+    T: Copy + bytemuck::Pod + bytemuck::Zeroable,
+{
     pub character_rule: CharacterRule,
     pub style_rule: StyleRule,
     pub entry_point: String,
@@ -63,7 +67,11 @@ pub struct ShaderCanvas<B, T> {
     _user_data: PhantomData<T>,
 }
 
-impl<T, B: TuiShaderBackend<T>> ShaderCanvas<B, T> {
+impl<B, T> ShaderCanvas<B, T>
+where
+    B: TuiShaderBackend,
+    T: Copy + bytemuck::Pod + bytemuck::Zeroable,
+{
     /// Creates a new instance of [`ShaderCanvas`].
     pub fn new() -> Self {
         Self {
@@ -98,23 +106,31 @@ impl<T, B: TuiShaderBackend<T>> ShaderCanvas<B, T> {
     }
 }
 
-impl<T, B: TuiShaderBackend<T>> Default for ShaderCanvas<B, T> {
+impl<B, T> Default for ShaderCanvas<B, T>
+where
+    B: TuiShaderBackend,
+    T: Copy + bytemuck::Pod + bytemuck::Zeroable,
+{
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<T, B: TuiShaderBackend<T>> StatefulWidget for ShaderCanvas<B, T> {
-    type State = ShaderCanvasState<T, B>;
+impl<B, T> StatefulWidget for ShaderCanvas<B, T>
+where
+    B: TuiShaderBackend,
+    T: Copy + bytemuck::Pod + bytemuck::Zeroable,
+{
+    type State = ShaderCanvasState<B, T>;
     fn render(
         self,
         area: Rect,
         buf: &mut ratatui::buffer::Buffer,
-        state: &mut ShaderCanvasState<T, B>,
+        state: &mut ShaderCanvasState<B, T>,
     ) {
         let width = area.width;
         let height = area.height;
-        let samples = state.backend.execute(width, height);
+        let samples = state.backend.execute(width, height, state.user_data);
 
         for y in 0..height {
             for x in 0..width {
@@ -144,50 +160,70 @@ impl<T, B: TuiShaderBackend<T>> StatefulWidget for ShaderCanvas<B, T> {
 
 /// State struct for [`ShaderCanvas`], it holds the [`TuiShaderBackend`].
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct ShaderCanvasState<T, B: TuiShaderBackend<T>> {
+pub struct ShaderCanvasState<B, T>
+where
+    B: TuiShaderBackend,
+    T: Copy + bytemuck::Pod + bytemuck::Zeroable,
+{
     backend: B,
-    _user_data: PhantomData<T>,
+    user_data: Option<T>,
 }
 
-impl ShaderCanvasState<NoUserData, WgpuBackend<NoUserData>> {
+impl ShaderCanvasState<WgpuBackend, NoUserData> {
     /// Creates a new [`ShaderCanvasState`] using [`WgpuBackend`] as it's
     /// [`TuiShaderBackend`].
     pub fn wgpu(
         path_to_fragment_shader: &str,
         entry_point: &str,
-    ) -> ShaderCanvasState<NoUserData, WgpuBackend<NoUserData>> {
+    ) -> ShaderCanvasState<WgpuBackend, NoUserData> {
         let backend = WgpuBackend::new(path_to_fragment_shader, entry_point);
+        ShaderCanvasState::new(backend)
+    }
+}
+
+impl<T> ShaderCanvasState<WgpuBackend, T>
+where
+    T: Copy + bytemuck::Pod + bytemuck::Zeroable,
+{
+    pub fn wgpu_with_user_data(
+        path_to_fragment_shader: &str,
+        entry_point: &str,
+        user_data: T,
+    ) -> ShaderCanvasState<WgpuBackend, T> {
+        let backend = WgpuBackend::new(path_to_fragment_shader, entry_point);
+        ShaderCanvasState::new_with_user_data(backend, user_data)
+    }
+}
+
+impl<B: TuiShaderBackend> ShaderCanvasState<B, NoUserData> {
+    /// Creates a new [`ShaderCanvasState`] instance by passing in the desired [`TuiShaderBackend`].
+    pub fn new(backend: B) -> ShaderCanvasState<B, NoUserData> {
         ShaderCanvasState {
             backend,
-            _user_data: PhantomData,
+            user_data: None,
         }
     }
 }
 
-impl<T, B: TuiShaderBackend<T>> ShaderCanvasState<T, B> {
-    /// Creates a new [`ShaderCanvasState`] instance by passing in the desired [`TuiShaderBackend`].
-    pub fn new(backend: B) -> ShaderCanvasState<T, B> {
-        ShaderCanvasState {
+impl<B, T> ShaderCanvasState<B, T>
+where
+    B: TuiShaderBackend,
+    T: Copy + bytemuck::Pod + bytemuck::Zeroable,
+{
+    pub fn new_with_user_data(backend: B, user_data: T) -> Self {
+        Self {
             backend,
-            _user_data: PhantomData,
+            user_data: Some(user_data),
         }
     }
 }
 
-impl<T, B: TuiShaderBackend<T>> ShaderCanvasState<T, B> {
-    /// Creates a new [`ShaderCanvasState`] instance by passing in the desired [`TuiShaderBackend`].
-    pub fn with_user_data(mut self, user_data: T) -> ShaderCanvasState<T, B> {
-        self.backend.set_user_data(user_data);
-        self
-    }
-}
-
-impl Default for ShaderCanvasState<NoUserData, WgpuBackend<NoUserData>> {
+impl Default for ShaderCanvasState<WgpuBackend, NoUserData> {
     /// Creates a new [`ShaderCanvasState`] instance with a [`WgpuBackend`].
-    fn default() -> ShaderCanvasState<NoUserData, WgpuBackend<NoUserData>> {
+    fn default() -> Self {
         Self {
             backend: WgpuBackend::default(),
-            _user_data: PhantomData,
+            user_data: None,
         }
     }
 }
@@ -279,14 +315,14 @@ mod tests {
     #[test]
     fn default_wgsl_context() {
         let mut context = WgpuBackend::default();
-        let raw_buffer = context.execute(64, 64);
+        let raw_buffer = context.execute(64, 64, None::<NoUserData>);
         assert!(raw_buffer.iter().all(|pixel| pixel == &[255, 0, 255, 255]));
     }
 
     #[test]
     fn different_entry_points() {
         let mut context = WgpuBackend::new("src/shaders/default_fragment.wgsl", "green");
-        let raw_buffer = context.execute(64, 64);
+        let raw_buffer = context.execute(64, 64, None::<NoUserData>);
         assert!(raw_buffer.iter().all(|pixel| pixel == &[0, 255, 0, 255]));
     }
 
