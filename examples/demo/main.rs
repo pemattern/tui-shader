@@ -1,17 +1,9 @@
 const DARK_COLOR: ratatui::style::Color = ratatui::style::Color::Rgb(75, 71, 92);
 const LIGHT_COLOR: ratatui::style::Color = ratatui::style::Color::Rgb(215, 222, 220);
 
-#[repr(C)]
-#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-struct Data {
-    time: f32,
-}
-
 fn main() {
     let mut terminal = ratatui::init();
-    let data = Data { time: 1.0 };
-    let mut state =
-        tui_shader::ShaderCanvasState::wgpu_with_user_data("shaders/dither.wgsl", "main", data);
+    let mut state = tui_shader::ShaderCanvasState::wgpu("shaders/dither.wgsl", "main");
     const STYLE_RULE: tui_shader::StyleRule = tui_shader::StyleRule::Map(|sample| {
         if sample.r() > 127 {
             ratatui::style::Style::new().fg(DARK_COLOR).bg(LIGHT_COLOR)

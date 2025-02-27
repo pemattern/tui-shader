@@ -31,6 +31,7 @@ mod backend;
 
 use std::marker::PhantomData;
 
+use backend::cpu::CpuBackend;
 use backend::{NoUserData, TuiShaderBackend};
 use ratatui::layout::{Position, Rect};
 use ratatui::style::{Color, Style};
@@ -55,30 +56,20 @@ use crate::backend::wgpu::WgpuBackend;
 /// ```
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct ShaderCanvas<B, T>
-where
-    B: TuiShaderBackend,
-    T: Copy + bytemuck::Pod + bytemuck::Zeroable,
-{
+pub struct ShaderCanvas<T> {
     pub character_rule: CharacterRule,
     pub style_rule: StyleRule,
     pub entry_point: String,
-    _backend: PhantomData<B>,
     _user_data: PhantomData<T>,
 }
 
-impl<B, T> ShaderCanvas<B, T>
-where
-    B: TuiShaderBackend,
-    T: Copy + bytemuck::Pod + bytemuck::Zeroable,
-{
+impl<T> ShaderCanvas<T> {
     /// Creates a new instance of [`ShaderCanvas`].
     pub fn new() -> Self {
         Self {
             character_rule: CharacterRule::default(),
             style_rule: StyleRule::default(),
             entry_point: String::from("main"),
-            _backend: PhantomData,
             _user_data: PhantomData,
         }
     }
@@ -106,31 +97,23 @@ where
     }
 }
 
-impl<B, T> Default for ShaderCanvas<B, T>
-where
-    B: TuiShaderBackend,
-    T: Copy + bytemuck::Pod + bytemuck::Zeroable,
-{
+impl<T> Default for ShaderCanvas<T> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<B, T> StatefulWidget for ShaderCanvas<B, T>
-where
-    B: TuiShaderBackend,
-    T: Copy + bytemuck::Pod + bytemuck::Zeroable,
-{
-    type State = ShaderCanvasState<B, T>;
+impl<T> StatefulWidget for ShaderCanvas<T> {
+    type State = ShaderCanvasState<T>;
     fn render(
         self,
         area: Rect,
         buf: &mut ratatui::buffer::Buffer,
-        state: &mut ShaderCanvasState<B, T>,
+        state: &mut ShaderCanvasState<T>,
     ) {
         let width = area.width;
         let height = area.height;
-        let samples = state.backend.execute(width, height, state.user_data);
+        let samples = state.backend.execute(width, height, &state.user_data);
 
         for y in 0..height {
             for x in 0..width {
@@ -159,29 +142,24 @@ where
 }
 
 /// State struct for [`ShaderCanvas`], it holds the [`TuiShaderBackend`].
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct ShaderCanvasState<B, T>
-where
-    B: TuiShaderBackend,
-    T: Copy + bytemuck::Pod + bytemuck::Zeroable,
-{
-    backend: B,
-    user_data: Option<T>,
+pub struct ShaderCanvasState<T> {
+    backend: Box<dyn TuiShaderBackend<T>>,
+    user_data: T,
 }
 
-impl ShaderCanvasState<WgpuBackend, NoUserData> {
+impl ShaderCanvasState<NoUserData> {
     /// Creates a new [`ShaderCanvasState`] using [`WgpuBackend`] as it's
     /// [`TuiShaderBackend`].
-    pub fn wgpu(
-        path_to_fragment_shader: &str,
-        entry_point: &str,
-    ) -> ShaderCanvasState<WgpuBackend, NoUserData> {
-        let backend = WgpuBackend::new(path_to_fragment_shader, entry_point);
-        ShaderCanvasState::new(backend)
+    pub fn wgpu(path_to_fragment_shader: &str, entry_point: &str) -> Self {
+        let backend = Box::new(WgpuBackend::new(path_to_fragment_shader, entry_point));
+        Self {
+            backend,
+            user_data: NoUserData,
+        }
     }
 }
 
-impl<T> ShaderCanvasState<WgpuBackend, T>
+impl<T> ShaderCanvasState<T>
 where
     T: Copy + bytemuck::Pod + bytemuck::Zeroable,
 {
@@ -189,41 +167,44 @@ where
         path_to_fragment_shader: &str,
         entry_point: &str,
         user_data: T,
-    ) -> ShaderCanvasState<WgpuBackend, T> {
-        let backend = WgpuBackend::new(path_to_fragment_shader, entry_point);
-        ShaderCanvasState::new_with_user_data(backend, user_data)
+    ) -> Self {
+        let backend = Box::new(WgpuBackend::new(path_to_fragment_shader, entry_point));
+        Self { backend, user_data }
     }
 }
 
-impl<B: TuiShaderBackend> ShaderCanvasState<B, NoUserData> {
-    /// Creates a new [`ShaderCanvasState`] instance by passing in the desired [`TuiShaderBackend`].
-    pub fn new(backend: B) -> ShaderCanvasState<B, NoUserData> {
-        ShaderCanvasState {
-            backend,
-            user_data: None,
-        }
-    }
-}
-
-impl<B, T> ShaderCanvasState<B, T>
-where
-    B: TuiShaderBackend,
-    T: Copy + bytemuck::Pod + bytemuck::Zeroable,
-{
-    pub fn new_with_user_data(backend: B, user_data: T) -> Self {
+impl ShaderCanvasState<NoUserData> {
+    pub fn cpu<F>(callback: F) -> Self
+    where
+        F: Fn(u16, u16) -> [u8; 4] + 'static,
+    {
+        let backend = Box::new(CpuBackend::new(callback));
         Self {
             backend,
-            user_data: Some(user_data),
+            user_data: NoUserData,
         }
     }
 }
 
-impl Default for ShaderCanvasState<WgpuBackend, NoUserData> {
+impl<T> ShaderCanvasState<T>
+where
+    T: 'static,
+{
+    pub fn cpu_with_user_data<F>(callback: F, user_data: T) -> Self
+    where
+        F: Fn(u16, u16, &T) -> [u8; 4] + 'static,
+    {
+        let backend = Box::new(CpuBackend::new_with_user_data(callback));
+        Self { backend, user_data }
+    }
+}
+
+impl Default for ShaderCanvasState<NoUserData> {
     /// Creates a new [`ShaderCanvasState`] instance with a [`WgpuBackend`].
     fn default() -> Self {
         Self {
-            backend: WgpuBackend::default(),
-            user_data: None,
+            backend: Box::new(WgpuBackend::default()),
+            user_data: NoUserData,
         }
     }
 }
@@ -315,14 +296,14 @@ mod tests {
     #[test]
     fn default_wgsl_context() {
         let mut context = WgpuBackend::default();
-        let raw_buffer = context.execute(64, 64, None::<NoUserData>);
+        let raw_buffer = context.execute(64, 64, &NoUserData);
         assert!(raw_buffer.iter().all(|pixel| pixel == &[255, 0, 255, 255]));
     }
 
     #[test]
     fn different_entry_points() {
         let mut context = WgpuBackend::new("src/shaders/default_fragment.wgsl", "green");
-        let raw_buffer = context.execute(64, 64, None::<NoUserData>);
+        let raw_buffer = context.execute(64, 64, &NoUserData);
         assert!(raw_buffer.iter().all(|pixel| pixel == &[0, 255, 0, 255]));
     }
 
