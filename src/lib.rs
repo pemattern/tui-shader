@@ -30,6 +30,7 @@
 mod backend;
 
 use std::marker::PhantomData;
+use std::time::Instant;
 
 use backend::cpu::CpuBackend;
 use backend::{NoUserData, TuiShaderBackend};
@@ -113,7 +114,9 @@ impl<T> StatefulWidget for ShaderCanvas<T> {
     ) {
         let width = area.width;
         let height = area.height;
-        let samples = state.backend.execute(width, height, &state.user_data);
+        state.shader_input.resolution = [width.into(), height.into()];
+        state.shader_input.time = state.creation_time.elapsed().as_secs_f32();
+        let samples = state.backend.execute(&state.shader_input, &state.user_data);
 
         for y in 0..height {
             for x in 0..width {
@@ -144,7 +147,22 @@ impl<T> StatefulWidget for ShaderCanvas<T> {
 /// State struct for [`ShaderCanvas`], it holds the [`TuiShaderBackend`].
 pub struct ShaderCanvasState<T> {
     backend: Box<dyn TuiShaderBackend<T>>,
+    shader_input: ShaderInput,
     user_data: T,
+    creation_time: Instant,
+}
+
+impl<T> ShaderCanvasState<T> {
+    pub fn new(backend: Box<dyn TuiShaderBackend<T>>, user_data: T) -> Self {
+        let creation_time = Instant::now();
+        let shader_input = ShaderInput::new(creation_time.elapsed().as_secs_f32(), 0, 0);
+        ShaderCanvasState {
+            backend,
+            shader_input,
+            user_data,
+            creation_time,
+        }
+    }
 }
 
 impl ShaderCanvasState<NoUserData> {
@@ -152,10 +170,8 @@ impl ShaderCanvasState<NoUserData> {
     /// [`TuiShaderBackend`].
     pub fn wgpu(path_to_fragment_shader: &str, entry_point: &str) -> Self {
         let backend = Box::new(WgpuBackend::new(path_to_fragment_shader, entry_point));
-        Self {
-            backend,
-            user_data: NoUserData::default(),
-        }
+        let user_data = NoUserData::default();
+        Self::new(backend, user_data)
     }
 }
 
@@ -169,20 +185,18 @@ where
         user_data: T,
     ) -> Self {
         let backend = Box::new(WgpuBackend::new(path_to_fragment_shader, entry_point));
-        Self { backend, user_data }
+        Self::new(backend, user_data)
     }
 }
 
 impl ShaderCanvasState<NoUserData> {
     pub fn cpu<F>(callback: F) -> Self
     where
-        F: Fn(u16, u16) -> [u8; 4] + 'static,
+        F: Fn(u32, u32) -> [u8; 4] + 'static,
     {
         let backend = Box::new(CpuBackend::new(callback));
-        Self {
-            backend,
-            user_data: NoUserData::default(),
-        }
+        let user_data = NoUserData::default();
+        Self::new(backend, user_data)
     }
 }
 
@@ -192,19 +206,47 @@ where
 {
     pub fn cpu_with_user_data<F>(callback: F, user_data: T) -> Self
     where
-        F: Fn(u16, u16, &T) -> [u8; 4] + 'static,
+        F: Fn(u32, u32, &T) -> [u8; 4] + 'static,
     {
         let backend = Box::new(CpuBackend::new_with_user_data(callback));
-        Self { backend, user_data }
+        Self::new(backend, user_data)
     }
 }
 
 impl Default for ShaderCanvasState<NoUserData> {
     /// Creates a new [`ShaderCanvasState`] instance with a [`WgpuBackend`].
     fn default() -> Self {
+        let backend = Box::new(WgpuBackend::default());
+        let user_data = NoUserData::default();
+        Self::new(backend, user_data)
+    }
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct ShaderInput {
+    // struct field order matters
+    time: f32,
+    padding: f32,
+    resolution: [u32; 2],
+}
+
+impl ShaderInput {
+    pub fn new(time: f32, width: u16, height: u16) -> Self {
         Self {
-            backend: Box::new(WgpuBackend::default()),
-            user_data: NoUserData::default(),
+            time,
+            padding: f32::default(),
+            resolution: [width.into(), height.into()],
+        }
+    }
+}
+
+impl Default for ShaderInput {
+    fn default() -> Self {
+        Self {
+            time: 0.0,
+            padding: 0.0,
+            resolution: [64, 64],
         }
     }
 }
@@ -296,15 +338,25 @@ mod tests {
     #[test]
     fn default_wgsl_context() {
         let mut context = WgpuBackend::default();
-        let raw_buffer = context.execute(64, 64, &NoUserData::default());
+        let raw_buffer = context.execute(&ShaderInput::default(), &NoUserData::default());
         assert!(raw_buffer.iter().all(|pixel| pixel == &[255, 0, 255, 255]));
     }
 
     #[test]
     fn different_entry_points() {
         let mut context = WgpuBackend::new("src/shaders/default_fragment.wgsl", "green");
-        let raw_buffer = context.execute(64, 64, &NoUserData::default());
+        let raw_buffer = context.execute(&ShaderInput::default(), &NoUserData::default());
         assert!(raw_buffer.iter().all(|pixel| pixel == &[0, 255, 0, 255]));
+    }
+
+    #[test]
+    fn cpu_backend() {
+        fn cb(_x: u32, _y: u32) -> [u8; 4] {
+            [255, 0, 0, 255]
+        }
+        let mut context = CpuBackend::new(cb);
+        let raw_buffer = context.execute(&ShaderInput::default(), &NoUserData::default());
+        assert!(raw_buffer.iter().all(|pixel| pixel == &[255, 0, 0, 255]));
     }
 
     #[test]

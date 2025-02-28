@@ -1,18 +1,13 @@
-use std::{fs, marker::PhantomData, time::Instant};
+use std::{fs, marker::PhantomData};
 
 use pollster::FutureExt as _;
 use wgpu::util::DeviceExt;
 
+use crate::ShaderInput;
+
 use super::{NoUserData, TuiShaderBackend};
 
-#[repr(C)]
-#[derive(Copy, Clone, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
-struct ShaderInput {
-    // struct field order matters
-    time: f32,
-    padding: f32,
-    resolution: [f32; 2],
-}
+const DEFAULT_SIZE: u32 = 64;
 
 #[derive(Debug, Clone)]
 pub struct WgpuBackend<T>
@@ -26,9 +21,8 @@ where
     output_buffer: wgpu::Buffer,
     shader_input_buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
-    creation_time: Instant,
-    width: u16,
-    height: u16,
+    width: u32,
+    height: u32,
     _user_data: PhantomData<T>,
 }
 
@@ -107,22 +101,12 @@ where
             source: wgpu::ShaderSource::Wgsl(fragment_shader_source.into()),
         });
 
-        let creation_time = Instant::now();
-        let width = 64u16;
-        let height = 64u16;
-
-        let texture = Self::create_texture(&device, width.into(), height.into());
-        let output_buffer = Self::create_buffer(&device, width.into(), height.into());
-
-        let shader_input = ShaderInput {
-            time: creation_time.elapsed().as_secs_f32(),
-            resolution: [width.into(), height.into()],
-            padding: 0f32,
-        };
+        let texture = Self::create_texture(&device, DEFAULT_SIZE, DEFAULT_SIZE);
+        let output_buffer = Self::create_buffer(&device, DEFAULT_SIZE, DEFAULT_SIZE);
 
         let shader_input_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: None,
-            contents: bytemuck::cast_slice(&[shader_input]),
+            contents: bytemuck::cast_slice(&[ShaderInput::default()]),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
@@ -217,28 +201,27 @@ where
             device,
             queue,
             pipeline,
-            creation_time,
             texture,
             output_buffer,
             shader_input_buffer,
             bind_group,
-            width,
-            height,
+            width: DEFAULT_SIZE.into(),
+            height: DEFAULT_SIZE.into(),
             _user_data: PhantomData,
         }
     }
 
-    async fn execute_inner(&mut self, width: u16, height: u16, _user_data: &T) -> Vec<[u8; 4]> {
+    async fn execute_inner(&mut self, shader_input: &ShaderInput, _user_data: &T) -> Vec<[u8; 4]> {
+        let width = shader_input.resolution[0];
+        let height = shader_input.resolution[1];
         if bytes_per_row(width) != bytes_per_row(self.width) || height != self.height {
-            self.texture = Self::create_texture(&self.device, width.into(), height.into());
-            self.output_buffer = Self::create_buffer(&self.device, width.into(), height.into());
+            self.texture = Self::create_texture(&self.device, width, height);
+            self.output_buffer = Self::create_buffer(&self.device, width, height);
         }
         let bytes_per_row = bytes_per_row(width);
-
         let texture_view = self
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
-
         let render_target = wgpu::RenderPassColorAttachment {
             view: &texture_view,
             resolve_target: None,
@@ -247,7 +230,6 @@ where
                 store: wgpu::StoreOp::Store,
             },
         };
-
         let mut command_encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
@@ -274,26 +256,20 @@ where
                 buffer: &self.output_buffer,
                 layout: wgpu::TexelCopyBufferLayout {
                     offset: 0,
-                    bytes_per_row: Some(bytes_per_row.into()),
-                    rows_per_image: Some(height.into()),
+                    bytes_per_row: Some(bytes_per_row),
+                    rows_per_image: Some(height),
                 },
             },
             wgpu::Extent3d {
-                width: width.into(),
-                height: height.into(),
+                width,
+                height,
                 depth_or_array_layers: 1,
             },
         );
-
-        let elapsed = self.creation_time.elapsed().as_secs_f32();
         self.queue.write_buffer(
             &self.shader_input_buffer,
             0,
-            bytemuck::cast_slice(&[ShaderInput {
-                time: elapsed,
-                resolution: [self.width.into(), self.height.into()],
-                padding: 0f32,
-            }]),
+            bytemuck::cast_slice(&[*shader_input]),
         );
         self.queue.submit(Some(command_encoder.finish()));
 
@@ -332,8 +308,8 @@ impl<T> TuiShaderBackend<T> for WgpuBackend<T>
 where
     T: Copy + Clone + Default + bytemuck::Pod + bytemuck::Zeroable,
 {
-    fn execute(&mut self, width: u16, height: u16, user_data: &T) -> Vec<[u8; 4]> {
-        self.execute_inner(width, height, user_data).block_on()
+    fn execute(&mut self, shader_input: &ShaderInput, user_data: &T) -> Vec<[u8; 4]> {
+        self.execute_inner(shader_input, user_data).block_on()
     }
 }
 
@@ -343,12 +319,12 @@ impl Default for WgpuBackend<NoUserData> {
     }
 }
 
-fn bytes_per_row(width: u16) -> u16 {
+fn bytes_per_row(width: u32) -> u32 {
     let row_size = width * 4;
     (row_size + 255) & !255
 }
 
-fn row_padding(width: u16) -> u16 {
+fn row_padding(width: u32) -> u32 {
     let row_size = width * 4;
     let bytes_per_row = bytes_per_row(width);
     (bytes_per_row - row_size) / 4

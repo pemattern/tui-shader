@@ -1,7 +1,7 @@
 struct FragmentInput {
     time: f32,
     padding: f32,
-    resolution: vec2<f32>,
+    resolution: vec2<u32>,
 }
 
 @group(0) @binding(0) var<uniform> input: FragmentInput;
@@ -99,9 +99,9 @@ const SOBEL_Y: array<array<f32, 3>, 3> = array(
 fn sobel(pixel_position: vec2<f32>) -> f32 {
     var sum_x = f32(0.0);
     var sum_y = f32(0.0);
-    for (var x: i32; x <= 1; x++) {
-        for (var y: i32; y <= 1; y ++) {
-            let uv = (pixel_position + vec2<f32>(f32(x), f32(y))) / input.resolution;
+    for (var x: i32 = -1; x <= 1; x++) {
+        for (var y: i32 = -1; y <= 1; y ++) {
+            let uv = (pixel_position + vec2<f32>(f32(x), f32(y))) / vec2<f32>(input.resolution);
             let sample = simplex_3(vec3<f32>(uv.x * 2.0, uv.y * 2.0, input.time * 0.35));
             sum_x = sum_x + sample * SOBEL_X[x + 1][y + 1];
             sum_y = sum_y + sample * SOBEL_Y[x + 1][y + 1];
@@ -139,7 +139,7 @@ fn main(@location(0) uv: vec2<f32>, @builtin(position) position: vec4<f32>) -> @
         }
     } else {
         let sobel = sobel(position.xy);
-        if sobel > 0.5 {
+        if sobel > 0.1 {
             return dark_color;
         } else {
             return light_color;
