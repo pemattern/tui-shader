@@ -114,9 +114,8 @@ impl<T> StatefulWidget for ShaderCanvas<T> {
     ) {
         let width = area.width;
         let height = area.height;
-        state.shader_input.resolution = [width.into(), height.into()];
-        state.shader_input.time = state.creation_time.elapsed().as_secs_f32();
-        let samples = state.backend.execute(&state.shader_input, &state.user_data);
+        let shader_input = ShaderInput::new(state.instant.elapsed().as_secs_f32(), width, height);
+        let samples = state.backend.execute(&shader_input, &state.user_data);
 
         for y in 0..height {
             for x in 0..width {
@@ -145,33 +144,44 @@ impl<T> StatefulWidget for ShaderCanvas<T> {
 }
 
 /// State struct for [`ShaderCanvas`], it holds the [`TuiShaderBackend`].
-pub struct ShaderCanvasState<T> {
+pub struct ShaderCanvasState<T = NoUserData> {
     backend: Box<dyn TuiShaderBackend<T>>,
-    shader_input: ShaderInput,
     user_data: T,
-    creation_time: Instant,
+    instant: Instant,
 }
 
 impl<T> ShaderCanvasState<T> {
-    pub fn new(backend: Box<dyn TuiShaderBackend<T>>, user_data: T) -> Self {
+    pub fn new<B: TuiShaderBackend<T> + 'static>(backend: B, user_data: T) -> Self {
+        let backend = Box::new(backend);
         let creation_time = Instant::now();
-        let shader_input = ShaderInput::new(creation_time.elapsed().as_secs_f32(), 0, 0);
         ShaderCanvasState {
             backend,
-            shader_input,
             user_data,
-            creation_time,
+            instant: creation_time,
         }
     }
 }
 
-impl ShaderCanvasState<NoUserData> {
+impl ShaderCanvasState {
     /// Creates a new [`ShaderCanvasState`] using [`WgpuBackend`] as it's
     /// [`TuiShaderBackend`].
     pub fn wgpu(path_to_fragment_shader: &str, entry_point: &str) -> Self {
-        let backend = Box::new(WgpuBackend::new(path_to_fragment_shader, entry_point));
+        let backend = WgpuBackend::new(path_to_fragment_shader, entry_point);
         let user_data = NoUserData::default();
         Self::new(backend, user_data)
+    }
+
+    pub fn cpu<F>(callback: F) -> Self
+    where
+        F: Fn(u32, u32) -> Pixel + 'static,
+    {
+        let backend = CpuBackend::new(callback);
+        let user_data = NoUserData::default();
+        Self::new(backend, user_data)
+    }
+
+    pub fn builder() -> ShaderCanvasStateBuilder {
+        ShaderCanvasStateBuilder::default()
     }
 }
 
@@ -184,18 +194,7 @@ where
         entry_point: &str,
         user_data: T,
     ) -> Self {
-        let backend = Box::new(WgpuBackend::new(path_to_fragment_shader, entry_point));
-        Self::new(backend, user_data)
-    }
-}
-
-impl ShaderCanvasState<NoUserData> {
-    pub fn cpu<F>(callback: F) -> Self
-    where
-        F: Fn(u32, u32) -> [u8; 4] + 'static,
-    {
-        let backend = Box::new(CpuBackend::new(callback));
-        let user_data = NoUserData::default();
+        let backend = WgpuBackend::new(path_to_fragment_shader, entry_point);
         Self::new(backend, user_data)
     }
 }
@@ -206,22 +205,60 @@ where
 {
     pub fn cpu_with_user_data<F>(callback: F, user_data: T) -> Self
     where
-        F: Fn(u32, u32, &T) -> [u8; 4] + 'static,
+        F: Fn(u32, u32, &T) -> Pixel + 'static,
     {
-        let backend = Box::new(CpuBackend::new_with_user_data(callback));
+        let backend = CpuBackend::new_with_user_data(callback);
         Self::new(backend, user_data)
     }
 }
 
-impl Default for ShaderCanvasState<NoUserData> {
+impl Default for ShaderCanvasState {
     /// Creates a new [`ShaderCanvasState`] instance with a [`WgpuBackend`].
     fn default() -> Self {
-        let backend = Box::new(WgpuBackend::default());
+        let backend = WgpuBackend::default();
         let user_data = NoUserData::default();
         Self::new(backend, user_data)
     }
 }
 
+#[derive(Default)]
+pub struct ShaderCanvasStateBuilder<T = NoUserData> {
+    backend: Option<Box<dyn TuiShaderBackend<T>>>,
+    user_data: Option<T>,
+    instant: Option<Instant>,
+}
+
+impl<T> ShaderCanvasStateBuilder<T> {
+    pub fn with_backend<B: TuiShaderBackend<T> + 'static>(mut self, backend: B) -> Self {
+        self.backend = Some(Box::new(backend));
+        self
+    }
+
+    pub fn with_user_data(mut self, user_data: T) -> Self {
+        self.user_data = Some(user_data);
+        self
+    }
+
+    pub fn with_instant(mut self, instant: Instant) -> Self {
+        self.instant = Some(instant);
+        self
+    }
+}
+
+impl ShaderCanvasStateBuilder {
+    pub fn build(self) -> ShaderCanvasState {
+        let backend = self
+            .backend
+            .unwrap_or_else(|| Box::new(WgpuBackend::default()));
+        let user_data = NoUserData::default();
+        let instant = self.instant.unwrap_or_else(|| Instant::now());
+        ShaderCanvasState {
+            backend,
+            user_data,
+            instant,
+        }
+    }
+}
 #[repr(C)]
 #[derive(Copy, Clone, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct ShaderInput {
@@ -289,33 +326,33 @@ pub enum StyleRule {
 /// Primarily used in [`CharacterRule::Map`] and [`StyleRule::Map`], it provides access to a Cells color and position
 /// allowing to map the output of the shader to more complex behaviour.
 pub struct Sample {
-    value: [u8; 4],
+    pixel: Pixel,
     position: (u16, u16),
 }
 
 impl Sample {
-    fn new(value: [u8; 4], position: (u16, u16)) -> Self {
-        Self { value, position }
+    fn new(pixel: Pixel, position: (u16, u16)) -> Self {
+        Self { pixel, position }
     }
 
     /// The red channel of the [`Sample`]
     pub fn r(&self) -> u8 {
-        self.value[0]
+        self.pixel[0]
     }
 
     /// The green channel of the [`Sample`]
     pub fn g(&self) -> u8 {
-        self.value[1]
+        self.pixel[1]
     }
 
     /// The blue channel of the [`Sample`]
     pub fn b(&self) -> u8 {
-        self.value[2]
+        self.pixel[2]
     }
 
     /// The alpha channel of the [`Sample`]
     pub fn a(&self) -> u8 {
-        self.value[3]
+        self.pixel[3]
     }
 
     /// The x coordinate of the [`Sample`]
@@ -328,6 +365,8 @@ impl Sample {
         self.position.1
     }
 }
+
+pub type Pixel = [u8; 4];
 
 #[cfg(test)]
 mod tests {
@@ -351,7 +390,7 @@ mod tests {
 
     #[test]
     fn cpu_backend() {
-        fn cb(_x: u32, _y: u32) -> [u8; 4] {
+        fn cb(_x: u32, _y: u32) -> Pixel {
             [255, 0, 0, 255]
         }
         let mut context = CpuBackend::new(cb);

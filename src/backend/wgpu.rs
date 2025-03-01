@@ -3,7 +3,7 @@ use std::{fs, marker::PhantomData};
 use pollster::FutureExt as _;
 use wgpu::util::DeviceExt;
 
-use crate::ShaderInput;
+use crate::{Pixel, ShaderInput};
 
 use super::{NoUserData, TuiShaderBackend};
 
@@ -211,7 +211,7 @@ where
         }
     }
 
-    async fn execute_inner(&mut self, shader_input: &ShaderInput, _user_data: &T) -> Vec<[u8; 4]> {
+    async fn execute_inner(&mut self, shader_input: &ShaderInput, _user_data: &T) -> Vec<Pixel> {
         let width = shader_input.resolution[0];
         let height = shader_input.resolution[1];
         if bytes_per_row(width) != bytes_per_row(self.width) || height != self.height {
@@ -286,13 +286,13 @@ where
             .await
             .expect("unable to receive message all senders have been dropped")
             .expect("on unexpected error occured");
-        let padded_buffer: Vec<[u8; 4]>;
+        let padded_buffer: Vec<Pixel>;
         {
             let view = buffer_slice.get_mapped_range();
             padded_buffer = bytemuck::cast_slice(&view).to_vec();
         }
         self.output_buffer.unmap();
-        let mut buffer: Vec<[u8; 4]> = Vec::new();
+        let mut buffer: Vec<Pixel> = Vec::new();
         for y in 0..height {
             for x in 0..width {
                 let index = (y * (width + row_padding(width)) + x) as usize;
@@ -308,7 +308,7 @@ impl<T> TuiShaderBackend<T> for WgpuBackend<T>
 where
     T: Copy + Clone + Default + bytemuck::Pod + bytemuck::Zeroable,
 {
-    fn execute(&mut self, shader_input: &ShaderInput, user_data: &T) -> Vec<[u8; 4]> {
+    fn execute(&mut self, shader_input: &ShaderInput, user_data: &T) -> Vec<Pixel> {
         self.execute_inner(shader_input, user_data).block_on()
     }
 }
