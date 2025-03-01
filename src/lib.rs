@@ -114,8 +114,8 @@ impl<T> StatefulWidget for ShaderCanvas<T> {
     ) {
         let width = area.width;
         let height = area.height;
-        let shader_input = ShaderInput::new(state.instant.elapsed().as_secs_f32(), width, height);
-        let samples = state.backend.execute(&shader_input, &state.user_data);
+        let ctx = ShaderContext::new(state.instant.elapsed().as_secs_f32(), width, height);
+        let samples = state.backend.execute(ctx, &state.user_data);
 
         for y in 0..height {
             for x in 0..width {
@@ -173,7 +173,7 @@ impl ShaderCanvasState {
 
     pub fn cpu<F>(callback: F) -> Self
     where
-        F: Fn(u32, u32) -> Pixel + 'static,
+        F: Fn(u32, u32, ShaderContext) -> Pixel + 'static,
     {
         let backend = CpuBackend::new(callback);
         let user_data = NoUserData::default();
@@ -205,7 +205,7 @@ where
 {
     pub fn cpu_with_user_data<F>(callback: F, user_data: T) -> Self
     where
-        F: Fn(u32, u32, &T) -> Pixel + 'static,
+        F: Fn(u32, u32, ShaderContext, &T) -> Pixel + 'static,
     {
         let backend = CpuBackend::new_with_user_data(callback);
         Self::new(backend, user_data)
@@ -261,14 +261,14 @@ impl ShaderCanvasStateBuilder {
 }
 #[repr(C)]
 #[derive(Copy, Clone, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct ShaderInput {
+pub struct ShaderContext {
     // struct field order matters
     time: f32,
     padding: f32,
     resolution: [u32; 2],
 }
 
-impl ShaderInput {
+impl ShaderContext {
     pub fn new(time: f32, width: u16, height: u16) -> Self {
         Self {
             time,
@@ -278,7 +278,7 @@ impl ShaderInput {
     }
 }
 
-impl Default for ShaderInput {
+impl Default for ShaderContext {
     fn default() -> Self {
         Self {
             time: 0.0,
@@ -377,24 +377,24 @@ mod tests {
     #[test]
     fn default_wgsl_context() {
         let mut context = WgpuBackend::default();
-        let raw_buffer = context.execute(&ShaderInput::default(), &NoUserData::default());
+        let raw_buffer = context.execute(ShaderContext::default(), &NoUserData::default());
         assert!(raw_buffer.iter().all(|pixel| pixel == &[255, 0, 255, 255]));
     }
 
     #[test]
     fn different_entry_points() {
         let mut context = WgpuBackend::new("src/shaders/default_fragment.wgsl", "green");
-        let raw_buffer = context.execute(&ShaderInput::default(), &NoUserData::default());
+        let raw_buffer = context.execute(ShaderContext::default(), &NoUserData::default());
         assert!(raw_buffer.iter().all(|pixel| pixel == &[0, 255, 0, 255]));
     }
 
     #[test]
     fn cpu_backend() {
-        fn cb(_x: u32, _y: u32) -> Pixel {
+        fn red(_: u32, _: u32, _: ShaderContext) -> Pixel {
             [255, 0, 0, 255]
         }
-        let mut context = CpuBackend::new(cb);
-        let raw_buffer = context.execute(&ShaderInput::default(), &NoUserData::default());
+        let mut context = CpuBackend::new(red);
+        let raw_buffer = context.execute(ShaderContext::default(), &NoUserData::default());
         assert!(raw_buffer.iter().all(|pixel| pixel == &[255, 0, 0, 255]));
     }
 

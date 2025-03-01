@@ -1,4 +1,4 @@
-use crate::{Pixel, ShaderInput};
+use crate::{Pixel, ShaderContext};
 
 pub mod cpu;
 pub mod wgpu;
@@ -8,5 +8,5 @@ pub mod wgpu;
 pub struct NoUserData(f32);
 
 pub trait TuiShaderBackend<T> {
-    fn execute(&mut self, shader_input: &ShaderInput, user_data: &T) -> Vec<Pixel>;
+    fn execute(&mut self, ctx: ShaderContext, user_data: &T) -> Vec<Pixel>;
 }

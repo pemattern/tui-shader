@@ -3,7 +3,7 @@ use std::{fs, marker::PhantomData};
 use pollster::FutureExt as _;
 use wgpu::util::DeviceExt;
 
-use crate::{Pixel, ShaderInput};
+use crate::{Pixel, ShaderContext};
 
 use super::{NoUserData, TuiShaderBackend};
 
@@ -19,7 +19,7 @@ where
     pipeline: wgpu::RenderPipeline,
     texture: wgpu::Texture,
     output_buffer: wgpu::Buffer,
-    shader_input_buffer: wgpu::Buffer,
+    ctx_buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
     width: u32,
     height: u32,
@@ -104,9 +104,9 @@ where
         let texture = Self::create_texture(&device, DEFAULT_SIZE, DEFAULT_SIZE);
         let output_buffer = Self::create_buffer(&device, DEFAULT_SIZE, DEFAULT_SIZE);
 
-        let shader_input_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        let ctx_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: None,
-            contents: bytemuck::cast_slice(&[ShaderInput::default()]),
+            contents: bytemuck::cast_slice(&[ShaderContext::default()]),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
@@ -148,7 +148,7 @@ where
                 wgpu::BindGroupEntry {
                     binding: 0,
                     resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                        buffer: &shader_input_buffer,
+                        buffer: &ctx_buffer,
                         offset: 0,
                         size: None,
                     }),
@@ -203,7 +203,7 @@ where
             pipeline,
             texture,
             output_buffer,
-            shader_input_buffer,
+            ctx_buffer,
             bind_group,
             width: DEFAULT_SIZE.into(),
             height: DEFAULT_SIZE.into(),
@@ -211,9 +211,9 @@ where
         }
     }
 
-    async fn execute_inner(&mut self, shader_input: &ShaderInput, _user_data: &T) -> Vec<Pixel> {
-        let width = shader_input.resolution[0];
-        let height = shader_input.resolution[1];
+    async fn execute_inner(&mut self, ctx: ShaderContext, _user_data: &T) -> Vec<Pixel> {
+        let width = ctx.resolution[0];
+        let height = ctx.resolution[1];
         if bytes_per_row(width) != bytes_per_row(self.width) || height != self.height {
             self.texture = Self::create_texture(&self.device, width, height);
             self.output_buffer = Self::create_buffer(&self.device, width, height);
@@ -266,11 +266,8 @@ where
                 depth_or_array_layers: 1,
             },
         );
-        self.queue.write_buffer(
-            &self.shader_input_buffer,
-            0,
-            bytemuck::cast_slice(&[*shader_input]),
-        );
+        self.queue
+            .write_buffer(&self.ctx_buffer, 0, bytemuck::cast_slice(&[ctx]));
         self.queue.submit(Some(command_encoder.finish()));
 
         let buffer_slice = self.output_buffer.slice(..);
@@ -308,8 +305,8 @@ impl<T> TuiShaderBackend<T> for WgpuBackend<T>
 where
     T: Copy + Clone + Default + bytemuck::Pod + bytemuck::Zeroable,
 {
-    fn execute(&mut self, shader_input: &ShaderInput, user_data: &T) -> Vec<Pixel> {
-        self.execute_inner(shader_input, user_data).block_on()
+    fn execute(&mut self, ctx: ShaderContext, user_data: &T) -> Vec<Pixel> {
+        self.execute_inner(ctx, user_data).block_on()
     }
 }
 
