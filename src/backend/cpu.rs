@@ -4,6 +4,7 @@ use super::{NoUserData, TuiShaderBackend};
 
 pub struct CpuBackend<T = NoUserData> {
     callback: Box<dyn CpuShaderCallback<T>>,
+    user_data: T,
 }
 
 impl CpuBackend {
@@ -13,33 +14,39 @@ impl CpuBackend {
     {
         Self {
             callback: Box::new(CpuShaderCallbackWithoutUserData(callback)),
+            user_data: Default::default(),
         }
     }
 }
 
 impl<T> CpuBackend<T> {
-    pub fn new_with_user_data<F>(callback: F) -> Self
+    pub fn new_with_user_data<F>(callback: F, user_data: T) -> Self
     where
         F: Fn(u32, u32, ShaderContext, &T) -> Pixel + 'static,
     {
         Self {
             callback: Box::new(callback),
+            user_data,
         }
     }
 }
 
 impl<T> TuiShaderBackend<T> for CpuBackend<T> {
-    fn execute(&mut self, ctx: ShaderContext, user_data: &T) -> Vec<Pixel> {
+    fn execute(&mut self, ctx: ShaderContext) -> Vec<Pixel> {
         let width = ctx.resolution[0];
         let height = ctx.resolution[1];
         let mut pixels = Vec::new();
         for y in 0..height {
             for x in 0..width {
-                let value = self.callback.call(x, y, ctx, user_data);
+                let value = self.callback.call(x, y, ctx, &self.user_data);
                 pixels.push(value);
             }
         }
         pixels
+    }
+
+    fn update_user_data(&mut self, user_data: T) {
+        self.user_data = user_data;
     }
 }
 

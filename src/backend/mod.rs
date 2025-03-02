@@ -8,5 +8,6 @@ pub mod wgpu;
 pub struct NoUserData(f32);
 
 pub trait TuiShaderBackend<T> {
-    fn execute(&mut self, ctx: ShaderContext, user_data: &T) -> Vec<Pixel>;
+    fn execute(&mut self, ctx: ShaderContext) -> Vec<Pixel>;
+    fn update_user_data(&mut self, user_data: T);
 }

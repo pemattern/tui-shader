@@ -1,4 +1,4 @@
-use std::{fs, marker::PhantomData};
+use std::fs;
 
 use pollster::FutureExt as _;
 use wgpu::util::DeviceExt;
@@ -10,7 +10,7 @@ use super::{NoUserData, TuiShaderBackend};
 const DEFAULT_SIZE: u32 = 64;
 
 #[derive(Debug, Clone)]
-pub struct WgpuBackend<T>
+pub struct WgpuBackend<T = NoUserData>
 where
     T: Copy + Clone + Default + bytemuck::Pod + bytemuck::Zeroable,
 {
@@ -23,17 +23,19 @@ where
     bind_group: wgpu::BindGroup,
     width: u32,
     height: u32,
-    _user_data: PhantomData<T>,
+    user_data: T,
+}
+
+impl WgpuBackend {
+    pub fn new(path_to_fragment_shader: &str, entry_point: &str) -> Self {
+        Self::new_inner(path_to_fragment_shader, entry_point).block_on()
+    }
 }
 
 impl<T> WgpuBackend<T>
 where
     T: Copy + Clone + Default + bytemuck::Pod + bytemuck::Zeroable,
 {
-    pub fn new(path_to_fragment_shader: &str, entry_point: &str) -> Self {
-        Self::new_inner(path_to_fragment_shader, entry_point).block_on()
-    }
-
     async fn get_device_and_queue() -> (wgpu::Device, wgpu::Queue) {
         let instance = wgpu::Instance::default();
 
@@ -207,11 +209,12 @@ where
             bind_group,
             width: DEFAULT_SIZE.into(),
             height: DEFAULT_SIZE.into(),
-            _user_data: PhantomData,
+            user_data: Default::default(),
         }
     }
 
-    async fn execute_inner(&mut self, ctx: ShaderContext, _user_data: &T) -> Vec<Pixel> {
+    async fn execute_inner(&mut self, ctx: ShaderContext) -> Vec<Pixel> {
+        // TODO: handle user_data;
         let width = ctx.resolution[0];
         let height = ctx.resolution[1];
         if bytes_per_row(width) != bytes_per_row(self.width) || height != self.height {
@@ -305,8 +308,12 @@ impl<T> TuiShaderBackend<T> for WgpuBackend<T>
 where
     T: Copy + Clone + Default + bytemuck::Pod + bytemuck::Zeroable,
 {
-    fn execute(&mut self, ctx: ShaderContext, user_data: &T) -> Vec<Pixel> {
-        self.execute_inner(ctx, user_data).block_on()
+    fn execute(&mut self, ctx: ShaderContext) -> Vec<Pixel> {
+        self.execute_inner(ctx).block_on()
+    }
+
+    fn update_user_data(&mut self, user_data: T) {
+        self.user_data = user_data;
     }
 }
 

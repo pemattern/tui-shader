@@ -29,7 +29,6 @@
 
 mod backend;
 
-use std::marker::PhantomData;
 use std::time::Instant;
 
 use backend::cpu::CpuBackend;
@@ -57,21 +56,19 @@ use crate::backend::wgpu::WgpuBackend;
 /// ```
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct ShaderCanvas<T> {
+pub struct ShaderCanvas {
     pub character_rule: CharacterRule,
     pub style_rule: StyleRule,
     pub entry_point: String,
-    _user_data: PhantomData<T>,
 }
 
-impl<T> ShaderCanvas<T> {
+impl ShaderCanvas {
     /// Creates a new instance of [`ShaderCanvas`].
     pub fn new() -> Self {
         Self {
             character_rule: CharacterRule::default(),
             style_rule: StyleRule::default(),
             entry_point: String::from("main"),
-            _user_data: PhantomData,
         }
     }
 
@@ -98,24 +95,19 @@ impl<T> ShaderCanvas<T> {
     }
 }
 
-impl<T> Default for ShaderCanvas<T> {
+impl Default for ShaderCanvas {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<T> StatefulWidget for ShaderCanvas<T> {
-    type State = ShaderCanvasState<T>;
-    fn render(
-        self,
-        area: Rect,
-        buf: &mut ratatui::buffer::Buffer,
-        state: &mut ShaderCanvasState<T>,
-    ) {
+impl StatefulWidget for ShaderCanvas {
+    type State = ShaderCanvasState;
+    fn render(self, area: Rect, buf: &mut ratatui::buffer::Buffer, state: &mut ShaderCanvasState) {
         let width = area.width;
         let height = area.height;
         let ctx = ShaderContext::new(state.instant.elapsed().as_secs_f32(), width, height);
-        let samples = state.backend.execute(ctx, &state.user_data);
+        let samples = state.backend.execute(ctx);
 
         for y in 0..height {
             for x in 0..width {
@@ -146,19 +138,22 @@ impl<T> StatefulWidget for ShaderCanvas<T> {
 /// State struct for [`ShaderCanvas`], it holds the [`TuiShaderBackend`].
 pub struct ShaderCanvasState<T = NoUserData> {
     backend: Box<dyn TuiShaderBackend<T>>,
-    user_data: T,
     instant: Instant,
 }
 
 impl<T> ShaderCanvasState<T> {
-    pub fn new<B: TuiShaderBackend<T> + 'static>(backend: B, user_data: T) -> Self {
+    pub fn new<B: TuiShaderBackend<T> + 'static>(backend: B) -> Self {
         let backend = Box::new(backend);
         let creation_time = Instant::now();
         ShaderCanvasState {
             backend,
-            user_data,
             instant: creation_time,
         }
+    }
+
+    pub fn instant(mut self, instant: Instant) -> Self {
+        self.instant = instant;
+        self
     }
 }
 
@@ -167,8 +162,7 @@ impl ShaderCanvasState {
     /// [`TuiShaderBackend`].
     pub fn wgpu(path_to_fragment_shader: &str, entry_point: &str) -> Self {
         let backend = WgpuBackend::new(path_to_fragment_shader, entry_point);
-        let user_data = NoUserData::default();
-        Self::new(backend, user_data)
+        Self::new(backend)
     }
 
     pub fn cpu<F>(callback: F) -> Self
@@ -176,39 +170,7 @@ impl ShaderCanvasState {
         F: Fn(u32, u32, ShaderContext) -> Pixel + 'static,
     {
         let backend = CpuBackend::new(callback);
-        let user_data = NoUserData::default();
-        Self::new(backend, user_data)
-    }
-
-    pub fn builder() -> ShaderCanvasStateBuilder {
-        ShaderCanvasStateBuilder::default()
-    }
-}
-
-impl<T> ShaderCanvasState<T>
-where
-    T: Copy + Default + bytemuck::Pod + bytemuck::Zeroable,
-{
-    pub fn wgpu_with_user_data(
-        path_to_fragment_shader: &str,
-        entry_point: &str,
-        user_data: T,
-    ) -> Self {
-        let backend = WgpuBackend::new(path_to_fragment_shader, entry_point);
-        Self::new(backend, user_data)
-    }
-}
-
-impl<T> ShaderCanvasState<T>
-where
-    T: 'static,
-{
-    pub fn cpu_with_user_data<F>(callback: F, user_data: T) -> Self
-    where
-        F: Fn(u32, u32, ShaderContext, &T) -> Pixel + 'static,
-    {
-        let backend = CpuBackend::new_with_user_data(callback);
-        Self::new(backend, user_data)
+        Self::new(backend)
     }
 }
 
@@ -216,52 +178,7 @@ impl Default for ShaderCanvasState {
     /// Creates a new [`ShaderCanvasState`] instance with a [`WgpuBackend`].
     fn default() -> Self {
         let backend = WgpuBackend::default();
-        let user_data = NoUserData::default();
-        Self::new(backend, user_data)
-    }
-}
-
-pub struct ShaderCanvasStateBuilder<T = NoUserData> {
-    backend: Box<dyn TuiShaderBackend<T>>,
-    user_data: Option<T>,
-    instant: Option<Instant>,
-}
-
-impl<T: Default> ShaderCanvasStateBuilder<T> {
-    pub fn backend<B: TuiShaderBackend<T> + 'static>(mut self, backend: B) -> Self {
-        self.backend = Box::new(backend);
-        self
-    }
-
-    pub fn user_data(mut self, user_data: T) -> Self {
-        self.user_data = Some(user_data);
-        self
-    }
-
-    pub fn instant(mut self, instant: Instant) -> Self {
-        self.instant = Some(instant);
-        self
-    }
-
-    pub fn build(self) -> ShaderCanvasState<T> {
-        let backend = self.backend;
-        let user_data = self.user_data.unwrap_or_else(Default::default);
-        let instant = self.instant.unwrap_or_else(Instant::now);
-        ShaderCanvasState {
-            backend,
-            user_data,
-            instant,
-        }
-    }
-}
-
-impl Default for ShaderCanvasStateBuilder {
-    fn default() -> Self {
-        Self {
-            backend: Box::new(CpuBackend::default()),
-            user_data: None,
-            instant: None,
-        }
+        Self::new(backend)
     }
 }
 
@@ -383,14 +300,14 @@ mod tests {
     #[test]
     fn default_wgsl_context() {
         let mut context = WgpuBackend::default();
-        let raw_buffer = context.execute(ShaderContext::default(), &NoUserData::default());
+        let raw_buffer = context.execute(ShaderContext::default());
         assert!(raw_buffer.iter().all(|pixel| pixel == &[255, 0, 255, 255]));
     }
 
     #[test]
     fn different_entry_points() {
         let mut context = WgpuBackend::new("src/shaders/default_fragment.wgsl", "green");
-        let raw_buffer = context.execute(ShaderContext::default(), &NoUserData::default());
+        let raw_buffer = context.execute(ShaderContext::default());
         assert!(raw_buffer.iter().all(|pixel| pixel == &[0, 255, 0, 255]));
     }
 
@@ -400,7 +317,7 @@ mod tests {
             [255, 0, 0, 255]
         }
         let mut context = CpuBackend::new(red);
-        let raw_buffer = context.execute(ShaderContext::default(), &NoUserData::default());
+        let raw_buffer = context.execute(ShaderContext::default());
         assert!(raw_buffer.iter().all(|pixel| pixel == &[255, 0, 0, 255]));
     }
 
