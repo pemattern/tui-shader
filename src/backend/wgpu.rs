@@ -1,5 +1,3 @@
-use std::fs;
-
 use pollster::FutureExt as _;
 use wgpu::util::DeviceExt;
 
@@ -27,8 +25,11 @@ where
 }
 
 impl WgpuBackend {
-    pub fn new(path_to_fragment_shader: &str, entry_point: &str) -> Self {
-        Self::new_inner(path_to_fragment_shader, entry_point).block_on()
+    pub fn new<'a, T: Into<wgpu::ShaderModuleDescriptor<'a>>>(
+        shader_desc: T,
+        entry_point: Option<&str>,
+    ) -> Self {
+        Self::new_inner(shader_desc.into(), entry_point).block_on()
     }
 }
 
@@ -89,19 +90,16 @@ where
         })
     }
 
-    async fn new_inner(path_to_fragment_shader: &str, entry_point: &str) -> Self {
+    async fn new_inner<'a>(
+        shader_desc: wgpu::ShaderModuleDescriptor<'a>,
+        entry_point: Option<&str>,
+    ) -> Self {
         let (device, queue) = Self::get_device_and_queue().await;
 
         let vertex_shader =
             device.create_shader_module(wgpu::include_wgsl!("../shaders/fullscreen_vertex.wgsl"));
 
-        let fragment_shader_source =
-            fs::read_to_string(path_to_fragment_shader).expect("Unable to read fragment shader");
-
-        let fragment_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: None,
-            source: wgpu::ShaderSource::Wgsl(fragment_shader_source.into()),
-        });
+        let fragment_shader = device.create_shader_module(shader_desc);
 
         let texture = Self::create_texture(&device, DEFAULT_SIZE, DEFAULT_SIZE);
         let output_buffer = Self::create_buffer(&device, DEFAULT_SIZE, DEFAULT_SIZE);
@@ -184,7 +182,7 @@ where
             },
             fragment: Some(wgpu::FragmentState {
                 module: &fragment_shader,
-                entry_point: Some(entry_point),
+                entry_point,
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
                 targets: &[Some(wgpu::ColorTargetState {
                     format: wgpu::TextureFormat::Rgba8Unorm,
@@ -317,9 +315,12 @@ where
     }
 }
 
-impl Default for WgpuBackend<NoUserData> {
+impl Default for WgpuBackend {
     fn default() -> Self {
-        Self::new("src/shaders/default_fragment.wgsl", "magenta")
+        Self::new(
+            wgpu::include_wgsl!("../../src/shaders/default_fragment.wgsl"),
+            Some("magenta"),
+        )
     }
 }
 
@@ -332,4 +333,27 @@ fn row_padding(width: u32) -> u32 {
     let row_size = width * 4;
     let bytes_per_row = bytes_per_row(width);
     (bytes_per_row - row_size) / 4
+}
+
+pub enum WgslShader<'a> {
+    Source(&'a str),
+    Path(&'a str),
+}
+
+impl<'a> From<WgslShader<'a>> for wgpu::ShaderModuleDescriptor<'a> {
+    fn from(value: WgslShader<'a>) -> Self {
+        match value {
+            WgslShader::Source(source) => wgpu::ShaderModuleDescriptor {
+                label: None,
+                source: wgpu::ShaderSource::Wgsl(source.into()),
+            },
+            WgslShader::Path(path) => {
+                let source = std::fs::read_to_string(path).expect("unable to read file");
+                wgpu::ShaderModuleDescriptor {
+                    label: None,
+                    source: wgpu::ShaderSource::Wgsl(source.into()),
+                }
+            }
+        }
+    }
 }

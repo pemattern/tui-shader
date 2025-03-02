@@ -1,6 +1,7 @@
 pub fn main() -> std::io::Result<()> {
     let mut terminal = ratatui::init();
-    let mut state = tui_shader::ShaderCanvasState::wgpu("shaders/voronoi.wgsl", "main");
+    let mut state =
+        tui_shader::ShaderCanvasState::wgpu(wgpu::include_wgsl!("../../shaders/voronoi.wgsl"));
 
     let start_time = std::time::Instant::now();
     loop {

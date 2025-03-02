@@ -59,7 +59,7 @@ use crate::backend::wgpu::WgpuBackend;
 pub struct ShaderCanvas {
     pub character_rule: CharacterRule,
     pub style_rule: StyleRule,
-    pub entry_point: String,
+    pub instant: Instant,
 }
 
 impl ShaderCanvas {
@@ -68,7 +68,7 @@ impl ShaderCanvas {
         Self {
             character_rule: CharacterRule::default(),
             style_rule: StyleRule::default(),
-            entry_point: String::from("main"),
+            instant: Instant::now(),
         }
     }
 
@@ -86,11 +86,9 @@ impl ShaderCanvas {
         self
     }
 
-    /// Sets the entry point of the fragment shader in the [`ShaderCanvas`].
-    /// The default value is "main".
     #[must_use]
-    pub fn entry_point(mut self, entry_point: &str) -> Self {
-        self.entry_point = String::from(entry_point);
+    pub fn instant(mut self, instant: Instant) -> Self {
+        self.instant = instant;
         self
     }
 }
@@ -106,7 +104,7 @@ impl StatefulWidget for ShaderCanvas {
     fn render(self, area: Rect, buf: &mut ratatui::buffer::Buffer, state: &mut ShaderCanvasState) {
         let width = area.width;
         let height = area.height;
-        let ctx = ShaderContext::new(state.instant.elapsed().as_secs_f32(), width, height);
+        let ctx = ShaderContext::new(self.instant.elapsed().as_secs_f32(), width, height);
         let samples = state.backend.execute(ctx);
 
         for y in 0..height {
@@ -138,30 +136,20 @@ impl StatefulWidget for ShaderCanvas {
 /// State struct for [`ShaderCanvas`], it holds the [`TuiShaderBackend`].
 pub struct ShaderCanvasState<T = NoUserData> {
     backend: Box<dyn TuiShaderBackend<T>>,
-    instant: Instant,
 }
 
 impl<T> ShaderCanvasState<T> {
     pub fn new<B: TuiShaderBackend<T> + 'static>(backend: B) -> Self {
         let backend = Box::new(backend);
-        let creation_time = Instant::now();
-        ShaderCanvasState {
-            backend,
-            instant: creation_time,
-        }
-    }
-
-    pub fn instant(mut self, instant: Instant) -> Self {
-        self.instant = instant;
-        self
+        ShaderCanvasState { backend }
     }
 }
 
 impl ShaderCanvasState {
     /// Creates a new [`ShaderCanvasState`] using [`WgpuBackend`] as it's
     /// [`TuiShaderBackend`].
-    pub fn wgpu(path_to_fragment_shader: &str, entry_point: &str) -> Self {
-        let backend = WgpuBackend::new(path_to_fragment_shader, entry_point);
+    pub fn wgpu<'a, T: Into<wgpu::ShaderModuleDescriptor<'a>>>(shader_desc: T) -> Self {
+        let backend = WgpuBackend::new(shader_desc, None);
         Self::new(backend)
     }
 
@@ -306,7 +294,10 @@ mod tests {
 
     #[test]
     fn different_entry_points() {
-        let mut context = WgpuBackend::new("src/shaders/default_fragment.wgsl", "green");
+        let mut context = WgpuBackend::new(
+            wgpu::include_wgsl!("../src/shaders/default_fragment.wgsl"),
+            Some("green"),
+        );
         let raw_buffer = context.execute(ShaderContext::default());
         assert!(raw_buffer.iter().all(|pixel| pixel == &[0, 255, 0, 255]));
     }
@@ -329,11 +320,7 @@ mod tests {
             .draw(|frame| {
                 frame.render_stateful_widget(
                     ShaderCanvas::new().character_rule(CharacterRule::Map(|sample| {
-                        if sample.x() == 0 {
-                            ' '
-                        } else {
-                            '.'
-                        }
+                        if sample.x() == 0 { ' ' } else { '.' }
                     })),
                     frame.area(),
                     &mut state,

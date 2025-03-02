@@ -22,6 +22,7 @@ impl CpuBackend {
 impl<T> CpuBackend<T> {
     pub fn new_with_user_data<F>(callback: F, user_data: T) -> Self
     where
+        T: Default,
         F: Fn(u32, u32, ShaderContext, &T) -> Pixel + 'static,
     {
         Self {
