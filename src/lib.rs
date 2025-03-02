@@ -221,37 +221,32 @@ impl Default for ShaderCanvasState {
     }
 }
 
-#[derive(Default)]
 pub struct ShaderCanvasStateBuilder<T = NoUserData> {
-    backend: Option<Box<dyn TuiShaderBackend<T>>>,
+    backend: Box<dyn TuiShaderBackend<T>>,
     user_data: Option<T>,
     instant: Option<Instant>,
 }
 
-impl<T> ShaderCanvasStateBuilder<T> {
-    pub fn with_backend<B: TuiShaderBackend<T> + 'static>(mut self, backend: B) -> Self {
-        self.backend = Some(Box::new(backend));
+impl<T: Default> ShaderCanvasStateBuilder<T> {
+    pub fn backend<B: TuiShaderBackend<T> + 'static>(mut self, backend: B) -> Self {
+        self.backend = Box::new(backend);
         self
     }
 
-    pub fn with_user_data(mut self, user_data: T) -> Self {
+    pub fn user_data(mut self, user_data: T) -> Self {
         self.user_data = Some(user_data);
         self
     }
 
-    pub fn with_instant(mut self, instant: Instant) -> Self {
+    pub fn instant(mut self, instant: Instant) -> Self {
         self.instant = Some(instant);
         self
     }
-}
 
-impl ShaderCanvasStateBuilder {
-    pub fn build(self) -> ShaderCanvasState {
-        let backend = self
-            .backend
-            .unwrap_or_else(|| Box::new(WgpuBackend::default()));
-        let user_data = NoUserData::default();
-        let instant = self.instant.unwrap_or_else(|| Instant::now());
+    pub fn build(self) -> ShaderCanvasState<T> {
+        let backend = self.backend;
+        let user_data = self.user_data.unwrap_or_else(Default::default);
+        let instant = self.instant.unwrap_or_else(Instant::now);
         ShaderCanvasState {
             backend,
             user_data,
@@ -259,6 +254,17 @@ impl ShaderCanvasStateBuilder {
         }
     }
 }
+
+impl Default for ShaderCanvasStateBuilder {
+    fn default() -> Self {
+        Self {
+            backend: Box::new(CpuBackend::default()),
+            user_data: None,
+            instant: None,
+        }
+    }
+}
+
 #[repr(C)]
 #[derive(Copy, Clone, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct ShaderContext {

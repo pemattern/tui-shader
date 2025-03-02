@@ -43,6 +43,12 @@ impl<T> TuiShaderBackend<T> for CpuBackend<T> {
     }
 }
 
+impl Default for CpuBackend {
+    fn default() -> Self {
+        Self::new(|_, _, _| [255, 0, 255, 255])
+    }
+}
+
 pub trait CpuShaderCallback<T = NoUserData> {
     fn call(&self, x: u32, y: u32, ctx: ShaderContext, user_data: &T) -> Pixel;
 }
