@@ -37,7 +37,7 @@ impl<T> WgpuBackend<T>
 where
     T: Copy + Clone + Default + bytemuck::Pod + bytemuck::Zeroable,
 {
-    async fn get_device_and_queue() -> (wgpu::Device, wgpu::Queue) {
+    async fn create_device_and_queue() -> (wgpu::Device, wgpu::Queue) {
         let instance = wgpu::Instance::default();
 
         let adapter = instance
@@ -90,11 +90,46 @@ where
         })
     }
 
+    fn create_pipeline(
+        device: &wgpu::Device,
+        pipeline_layout: &wgpu::PipelineLayout,
+        vertex_shader: &wgpu::ShaderModule,
+        fragment_shader: &wgpu::ShaderModule,
+        entry_point: Option<&str>,
+    ) -> wgpu::RenderPipeline {
+        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: None,
+            layout: Some(&pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: vertex_shader,
+                entry_point: None,
+                buffers: &[],
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: fragment_shader,
+                entry_point,
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: wgpu::TextureFormat::Rgba8Unorm,
+                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+            }),
+            primitive: wgpu::PrimitiveState::default(),
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState::default(),
+            multiview: None,
+            cache: None,
+        });
+        pipeline
+    }
+
     async fn new_inner<'a>(
         shader_desc: wgpu::ShaderModuleDescriptor<'a>,
         entry_point: Option<&str>,
     ) -> Self {
-        let (device, queue) = Self::get_device_and_queue().await;
+        let (device, queue) = Self::create_device_and_queue().await;
 
         let vertex_shader =
             device.create_shader_module(wgpu::include_wgsl!("../shaders/fullscreen_vertex.wgsl"));
@@ -171,31 +206,13 @@ where
             push_constant_ranges: &[],
         });
 
-        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: None,
-            layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &vertex_shader,
-                entry_point: Some("main"),
-                buffers: &[],
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &fragment_shader,
-                entry_point,
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: wgpu::TextureFormat::Rgba8Unorm,
-                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            primitive: wgpu::PrimitiveState::default(),
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState::default(),
-            multiview: None,
-            cache: None,
-        });
+        let pipeline = Self::create_pipeline(
+            &device,
+            &pipeline_layout,
+            &vertex_shader,
+            &fragment_shader,
+            entry_point,
+        );
 
         WgpuBackend {
             device,
