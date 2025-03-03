@@ -1,17 +1,12 @@
-use pollster::FutureExt as _;
+use pollster::FutureExt;
 use wgpu::util::DeviceExt;
 
 use crate::{Pixel, ShaderContext};
 
-use super::{NoUserData, TuiShaderBackend};
-
 const DEFAULT_SIZE: u32 = 64;
 
 #[derive(Debug, Clone)]
-pub struct WgpuBackend<T = NoUserData>
-where
-    T: Copy + Clone + Default + bytemuck::Pod + bytemuck::Zeroable,
-{
+pub struct ShaderCanvasState {
     device: wgpu::Device,
     queue: wgpu::Queue,
     pipeline: wgpu::RenderPipeline,
@@ -21,22 +16,22 @@ where
     bind_group: wgpu::BindGroup,
     width: u32,
     height: u32,
-    user_data: T,
 }
 
-impl WgpuBackend {
-    pub fn new<'a, T: Into<wgpu::ShaderModuleDescriptor<'a>>>(
-        shader_desc: T,
+impl ShaderCanvasState {
+    pub fn new<'a, S: Into<wgpu::ShaderModuleDescriptor<'a>>>(
+        shader: S,
         entry_point: Option<&str>,
     ) -> Self {
-        Self::new_inner(shader_desc.into(), entry_point).block_on()
+        Self::new_inner(shader.into(), entry_point).block_on()
     }
 }
 
-impl<T> WgpuBackend<T>
-where
-    T: Copy + Clone + Default + bytemuck::Pod + bytemuck::Zeroable,
-{
+impl ShaderCanvasState {
+    pub fn execute(&mut self, ctx: ShaderContext) -> Vec<Pixel> {
+        self.execute_inner(ctx).block_on()
+    }
+
     async fn create_device_and_queue() -> (wgpu::Device, wgpu::Queue) {
         let instance = wgpu::Instance::default();
 
@@ -126,15 +121,15 @@ where
     }
 
     async fn new_inner<'a>(
-        shader_desc: wgpu::ShaderModuleDescriptor<'a>,
+        desc: wgpu::ShaderModuleDescriptor<'a>,
         entry_point: Option<&str>,
     ) -> Self {
         let (device, queue) = Self::create_device_and_queue().await;
 
         let vertex_shader =
-            device.create_shader_module(wgpu::include_wgsl!("../shaders/fullscreen_vertex.wgsl"));
+            device.create_shader_module(wgpu::include_wgsl!("shaders/fullscreen_vertex.wgsl"));
 
-        let fragment_shader = device.create_shader_module(shader_desc);
+        let fragment_shader = device.create_shader_module(desc);
 
         let texture = Self::create_texture(&device, DEFAULT_SIZE, DEFAULT_SIZE);
         let output_buffer = Self::create_buffer(&device, DEFAULT_SIZE, DEFAULT_SIZE);
@@ -147,7 +142,7 @@ where
 
         let user_data_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: None,
-            contents: bytemuck::cast_slice(&[T::default()]),
+            contents: bytemuck::cast_slice(&[0.0]),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
@@ -214,7 +209,7 @@ where
             entry_point,
         );
 
-        WgpuBackend {
+        Self {
             device,
             queue,
             pipeline,
@@ -224,7 +219,6 @@ where
             bind_group,
             width: DEFAULT_SIZE.into(),
             height: DEFAULT_SIZE.into(),
-            user_data: Default::default(),
         }
     }
 
@@ -319,23 +313,10 @@ where
     }
 }
 
-impl<T> TuiShaderBackend<T> for WgpuBackend<T>
-where
-    T: Copy + Clone + Default + bytemuck::Pod + bytemuck::Zeroable,
-{
-    fn execute(&mut self, ctx: ShaderContext) -> Vec<Pixel> {
-        self.execute_inner(ctx).block_on()
-    }
-
-    fn update_user_data(&mut self, user_data: T) {
-        self.user_data = user_data;
-    }
-}
-
-impl Default for WgpuBackend {
+impl Default for ShaderCanvasState {
     fn default() -> Self {
         Self::new(
-            wgpu::include_wgsl!("../../src/shaders/default_fragment.wgsl"),
+            wgpu::include_wgsl!("shaders/default_fragment.wgsl"),
             Some("magenta"),
         )
     }

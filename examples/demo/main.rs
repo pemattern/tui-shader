@@ -4,7 +4,7 @@ const LIGHT_COLOR: ratatui::style::Color = ratatui::style::Color::Rgb(215, 222, 
 fn main() {
     let mut terminal = ratatui::init();
     let mut state =
-        tui_shader::ShaderCanvasState::wgpu(wgpu::include_wgsl!("../../shaders/dither.wgsl"));
+        tui_shader::ShaderCanvasState::new(wgpu::include_wgsl!("../../shaders/dither.wgsl"), None);
     const STYLE_RULE: tui_shader::StyleRule = tui_shader::StyleRule::Map(|sample| {
         if sample.r() > 127 {
             ratatui::style::Style::new().fg(DARK_COLOR).bg(LIGHT_COLOR)
