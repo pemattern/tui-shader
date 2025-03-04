@@ -5,7 +5,8 @@ pub fn main() -> std::io::Result<()> {
         std::io::Read::read_to_string(&mut stdin_lock, &mut s).unwrap();
     }
     let mut terminal = ratatui::init();
-    let mut state = tui_shader::ShaderCanvasState::wgpu("shaders/gradient.wgsl", "main");
+    let mut state =
+        tui_shader::ShaderCanvasState::new(wgpu::include_wgsl!("../../shaders/gradient.wgsl"));
     let start_time = std::time::Instant::now();
     while start_time.elapsed().as_secs() < 7 {
         terminal.draw(|frame| {

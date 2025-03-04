@@ -27,18 +27,14 @@
 //! ratatui::restore();
 //! ```
 
-mod backend;
-
-use std::marker::PhantomData;
-use std::time::Instant;
-
-use backend::cpu::CpuBackend;
-use backend::{NoUserData, TuiShaderBackend};
+use pollster::FutureExt as _;
 use ratatui::layout::{Position, Rect};
 use ratatui::style::{Color, Style};
 use ratatui::widgets::StatefulWidget;
+use std::time::Instant;
+use wgpu::util::DeviceExt;
 
-use crate::backend::wgpu::WgpuBackend;
+const DEFAULT_SIZE: u32 = 64;
 
 /// `ShaderCanvas` is a unit struct which implements the `StatefulWidget` trait from Ratatui.
 /// It holds the logic for applying the result of GPU computation to the `Buffer` struct which
@@ -57,21 +53,17 @@ use crate::backend::wgpu::WgpuBackend;
 /// ```
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct ShaderCanvas<T> {
+pub struct ShaderCanvas {
     pub character_rule: CharacterRule,
     pub style_rule: StyleRule,
-    pub entry_point: String,
-    _user_data: PhantomData<T>,
 }
 
-impl<T> ShaderCanvas<T> {
+impl ShaderCanvas {
     /// Creates a new instance of [`ShaderCanvas`].
     pub fn new() -> Self {
         Self {
             character_rule: CharacterRule::default(),
             style_rule: StyleRule::default(),
-            entry_point: String::from("main"),
-            _user_data: PhantomData,
         }
     }
 
@@ -88,34 +80,29 @@ impl<T> ShaderCanvas<T> {
         self.style_rule = style_rule;
         self
     }
-
-    /// Sets the entry point of the fragment shader in the [`ShaderCanvas`].
-    /// The default value is "main".
-    #[must_use]
-    pub fn entry_point(mut self, entry_point: &str) -> Self {
-        self.entry_point = String::from(entry_point);
-        self
-    }
 }
 
-impl<T> Default for ShaderCanvas<T> {
+impl Default for ShaderCanvas {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<T> StatefulWidget for ShaderCanvas<T> {
-    type State = ShaderCanvasState<T>;
-    fn render(
-        self,
-        area: Rect,
-        buf: &mut ratatui::buffer::Buffer,
-        state: &mut ShaderCanvasState<T>,
-    ) {
+impl StatefulWidget for ShaderCanvas {
+    type State = ShaderCanvasState;
+    fn render(self, area: Rect, buf: &mut ratatui::prelude::Buffer, state: &mut Self::State) {
+        StatefulWidget::render(&self, area, buf, state);
+    }
+}
+
+impl StatefulWidget for &ShaderCanvas {
+    type State = ShaderCanvasState;
+    fn render(self, area: Rect, buf: &mut ratatui::buffer::Buffer, state: &mut Self::State) {
         let width = area.width;
         let height = area.height;
-        let ctx = ShaderContext::new(state.instant.elapsed().as_secs_f32(), width, height);
-        let samples = state.backend.execute(ctx, &state.user_data);
+        let time = state.instant.elapsed().as_secs_f32();
+        let ctx = ShaderContext::new(time, width, height);
+        let samples = state.execute(ctx);
 
         for y in 0..height {
             for x in 0..width {
@@ -143,122 +130,294 @@ impl<T> StatefulWidget for ShaderCanvas<T> {
     }
 }
 
-/// State struct for [`ShaderCanvas`], it holds the [`TuiShaderBackend`].
-pub struct ShaderCanvasState<T = NoUserData> {
-    backend: Box<dyn TuiShaderBackend<T>>,
-    user_data: T,
+#[derive(Debug, Clone)]
+pub struct ShaderCanvasState {
+    device: wgpu::Device,
+    queue: wgpu::Queue,
+    pipeline: wgpu::RenderPipeline,
+    texture: wgpu::Texture,
+    output_buffer: wgpu::Buffer,
+    ctx_buffer: wgpu::Buffer,
+    bind_group: wgpu::BindGroup,
     instant: Instant,
-}
-
-impl<T> ShaderCanvasState<T> {
-    pub fn new<B: TuiShaderBackend<T> + 'static>(backend: B, user_data: T) -> Self {
-        let backend = Box::new(backend);
-        let creation_time = Instant::now();
-        ShaderCanvasState {
-            backend,
-            user_data,
-            instant: creation_time,
-        }
-    }
+    width: u32,
+    height: u32,
 }
 
 impl ShaderCanvasState {
-    /// Creates a new [`ShaderCanvasState`] using [`WgpuBackend`] as it's
-    /// [`TuiShaderBackend`].
-    pub fn wgpu(path_to_fragment_shader: &str, entry_point: &str) -> Self {
-        let backend = WgpuBackend::new(path_to_fragment_shader, entry_point);
-        let user_data = NoUserData::default();
-        Self::new(backend, user_data)
+    pub fn new<'a, S: Into<wgpu::ShaderModuleDescriptor<'a>>>(shader: S) -> Self {
+        Self::new_inner(shader.into(), None).block_on()
     }
 
-    pub fn cpu<F>(callback: F) -> Self
-    where
-        F: Fn(u32, u32, ShaderContext) -> Pixel + 'static,
-    {
-        let backend = CpuBackend::new(callback);
-        let user_data = NoUserData::default();
-        Self::new(backend, user_data)
-    }
-
-    pub fn builder() -> ShaderCanvasStateBuilder {
-        ShaderCanvasStateBuilder::default()
-    }
-}
-
-impl<T> ShaderCanvasState<T>
-where
-    T: Copy + Default + bytemuck::Pod + bytemuck::Zeroable,
-{
-    pub fn wgpu_with_user_data(
-        path_to_fragment_shader: &str,
-        entry_point: &str,
-        user_data: T,
+    pub fn new_with_entry_point<'a, S: Into<wgpu::ShaderModuleDescriptor<'a>>>(
+        shader: S,
+        entry_point: &'a str,
     ) -> Self {
-        let backend = WgpuBackend::new(path_to_fragment_shader, entry_point);
-        Self::new(backend, user_data)
+        Self::new_inner(shader.into(), Some(entry_point)).block_on()
     }
-}
 
-impl<T> ShaderCanvasState<T>
-where
-    T: 'static,
-{
-    pub fn cpu_with_user_data<F>(callback: F, user_data: T) -> Self
-    where
-        F: Fn(u32, u32, ShaderContext, &T) -> Pixel + 'static,
-    {
-        let backend = CpuBackend::new_with_user_data(callback);
-        Self::new(backend, user_data)
+    async fn new_inner<'a>(
+        desc: wgpu::ShaderModuleDescriptor<'a>,
+        entry_point: Option<&str>,
+    ) -> Self {
+        let (device, queue) = get_device_and_queue().await;
+
+        let vertex_shader =
+            device.create_shader_module(wgpu::include_wgsl!("shaders/fullscreen_vertex.wgsl"));
+
+        let fragment_shader = device.create_shader_module(desc);
+
+        let texture = create_texture(&device, DEFAULT_SIZE, DEFAULT_SIZE);
+        let output_buffer = create_buffer(&device, DEFAULT_SIZE, DEFAULT_SIZE);
+
+        let ctx_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: None,
+            contents: bytemuck::cast_slice(&[ShaderContext::default()]),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+
+        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            entries: &[wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            }],
+            label: None,
+        });
+
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                    buffer: &ctx_buffer,
+                    offset: 0,
+                    size: None,
+                }),
+            }],
+            label: None,
+        });
+
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: None,
+            bind_group_layouts: &[&bind_group_layout],
+            push_constant_ranges: &[],
+        });
+
+        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: None,
+            layout: Some(&pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &vertex_shader,
+                entry_point: Some("main"),
+                buffers: &[],
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &fragment_shader,
+                entry_point,
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: wgpu::TextureFormat::Rgba8Unorm,
+                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+            }),
+            primitive: wgpu::PrimitiveState::default(),
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState::default(),
+            multiview: None,
+            cache: None,
+        });
+
+        ShaderCanvasState {
+            device,
+            queue,
+            pipeline,
+            texture,
+            output_buffer,
+            ctx_buffer,
+            bind_group,
+            instant: Instant::now(),
+            width: DEFAULT_SIZE.into(),
+            height: DEFAULT_SIZE.into(),
+        }
+    }
+
+    fn execute(&mut self, ctx: ShaderContext) -> Vec<Pixel> {
+        self.execute_inner(ctx).block_on()
+    }
+
+    async fn execute_inner(&mut self, ctx: ShaderContext) -> Vec<Pixel> {
+        let width = ctx.resolution[0];
+        let height = ctx.resolution[1];
+        if bytes_per_row(width) != bytes_per_row(self.width) || height != self.height {
+            self.texture = create_texture(&self.device, width, height);
+            self.output_buffer = create_buffer(&self.device, width, height);
+        }
+        let bytes_per_row = bytes_per_row(width);
+        let texture_view = self
+            .texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
+        let render_target = wgpu::RenderPassColorAttachment {
+            view: &texture_view,
+            resolve_target: None,
+            ops: wgpu::Operations {
+                load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                store: wgpu::StoreOp::Store,
+            },
+        };
+        let mut command_encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+        {
+            let mut render_pass = command_encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: None,
+                color_attachments: &[Some(render_target)],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            });
+            render_pass.set_pipeline(&self.pipeline);
+            render_pass.set_bind_group(0, &self.bind_group, &[]);
+            render_pass.draw(0..3, 0..1);
+        }
+        command_encoder.copy_texture_to_buffer(
+            wgpu::TexelCopyTextureInfo {
+                texture: &self.texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d { x: 0, y: 0, z: 0 },
+                aspect: wgpu::TextureAspect::All,
+            },
+            wgpu::TexelCopyBufferInfo {
+                buffer: &self.output_buffer,
+                layout: wgpu::TexelCopyBufferLayout {
+                    offset: 0,
+                    bytes_per_row: Some(bytes_per_row),
+                    rows_per_image: Some(height),
+                },
+            },
+            wgpu::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
+        );
+        self.queue
+            .write_buffer(&self.ctx_buffer, 0, bytemuck::cast_slice(&[ctx]));
+        self.queue.submit(Some(command_encoder.finish()));
+
+        let buffer_slice = self.output_buffer.slice(..);
+        let (sender, receiver) = flume::bounded(1);
+        buffer_slice.map_async(wgpu::MapMode::Read, move |r| {
+            sender
+                .send(r)
+                .expect("unable to send buffer slice data to receiver");
+        });
+        self.device.poll(wgpu::Maintain::wait()).panic_on_timeout();
+        receiver
+            .recv_async()
+            .await
+            .expect("unable to receive message all senders have been dropped")
+            .expect("on unexpected error occured");
+        let padded_buffer: Vec<Pixel>;
+        {
+            let view = buffer_slice.get_mapped_range();
+            padded_buffer = bytemuck::cast_slice(&view).to_vec();
+        }
+        self.output_buffer.unmap();
+        let mut buffer: Vec<Pixel> = Vec::new();
+        for y in 0..height {
+            for x in 0..width {
+                let index = (y * (width + row_padding(width)) + x) as usize;
+                let pixel = padded_buffer[index];
+                buffer.push(pixel);
+            }
+        }
+        buffer
+    }
+
+    pub fn instant(mut self, instant: Instant) -> Self {
+        self.instant = instant;
+        self
     }
 }
 
 impl Default for ShaderCanvasState {
-    /// Creates a new [`ShaderCanvasState`] instance with a [`WgpuBackend`].
     fn default() -> Self {
-        let backend = WgpuBackend::default();
-        let user_data = NoUserData::default();
-        Self::new(backend, user_data)
+        Self::new(wgpu::include_wgsl!("shaders/default_fragment.wgsl"))
     }
 }
 
-#[derive(Default)]
-pub struct ShaderCanvasStateBuilder<T = NoUserData> {
-    backend: Option<Box<dyn TuiShaderBackend<T>>>,
-    user_data: Option<T>,
-    instant: Option<Instant>,
+fn bytes_per_row(width: u32) -> u32 {
+    let row_size = width * 4;
+    (row_size + 255) & !255
 }
 
-impl<T> ShaderCanvasStateBuilder<T> {
-    pub fn with_backend<B: TuiShaderBackend<T> + 'static>(mut self, backend: B) -> Self {
-        self.backend = Some(Box::new(backend));
-        self
-    }
-
-    pub fn with_user_data(mut self, user_data: T) -> Self {
-        self.user_data = Some(user_data);
-        self
-    }
-
-    pub fn with_instant(mut self, instant: Instant) -> Self {
-        self.instant = Some(instant);
-        self
-    }
+fn row_padding(width: u32) -> u32 {
+    let row_size = width * 4;
+    let bytes_per_row = bytes_per_row(width);
+    (bytes_per_row - row_size) / 4
 }
 
-impl ShaderCanvasStateBuilder {
-    pub fn build(self) -> ShaderCanvasState {
-        let backend = self
-            .backend
-            .unwrap_or_else(|| Box::new(WgpuBackend::default()));
-        let user_data = NoUserData::default();
-        let instant = self.instant.unwrap_or_else(|| Instant::now());
-        ShaderCanvasState {
-            backend,
-            user_data,
-            instant,
-        }
-    }
+async fn get_device_and_queue() -> (wgpu::Device, wgpu::Queue) {
+    let instance = wgpu::Instance::default();
+
+    let adapter = instance
+        .request_adapter(&wgpu::RequestAdapterOptions::default())
+        .await
+        .expect("unable to create adapter from wgpu instance");
+
+    let device_and_queue = adapter
+        .request_device(
+            &wgpu::DeviceDescriptor {
+                label: None,
+                required_features: wgpu::Features::empty(),
+                required_limits: wgpu::Limits::downlevel_defaults(),
+                memory_hints: wgpu::MemoryHints::Performance,
+            },
+            None,
+        )
+        .await
+        .expect("unable to create device and queue from wgpu adapter");
+    device_and_queue
 }
+
+fn create_texture(device: &wgpu::Device, width: u32, height: u32) -> wgpu::Texture {
+    let texture_desc = wgpu::TextureDescriptor {
+        size: wgpu::Extent3d {
+            width,
+            height,
+            depth_or_array_layers: 1,
+        },
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: wgpu::TextureFormat::Rgba8Unorm,
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+        label: None,
+        view_formats: &[wgpu::TextureFormat::Rgba8Unorm],
+    };
+    device.create_texture(&texture_desc)
+}
+
+fn create_buffer(device: &wgpu::Device, width: u32, height: u32) -> wgpu::Buffer {
+    let row_size = width * 4;
+    let bytes_per_row = (row_size + 255) & !255;
+
+    device.create_buffer(&wgpu::BufferDescriptor {
+        label: None,
+        size: (bytes_per_row * height) as wgpu::BufferAddress,
+        usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+        mapped_at_creation: false,
+    })
+}
+
 #[repr(C)]
 #[derive(Copy, Clone, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct ShaderContext {
@@ -375,27 +534,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn default_wgsl_context() {
-        let mut context = WgpuBackend::default();
-        let raw_buffer = context.execute(ShaderContext::default(), &NoUserData::default());
+    fn default_state() {
+        let mut state = ShaderCanvasState::default();
+        let raw_buffer = state.execute(ShaderContext::default());
         assert!(raw_buffer.iter().all(|pixel| pixel == &[255, 0, 255, 255]));
     }
 
     #[test]
     fn different_entry_points() {
-        let mut context = WgpuBackend::new("src/shaders/default_fragment.wgsl", "green");
-        let raw_buffer = context.execute(ShaderContext::default(), &NoUserData::default());
+        let mut state = ShaderCanvasState::new_with_entry_point(
+            wgpu::include_wgsl!("shaders/test_fragment.wgsl"),
+            "green",
+        );
+        let raw_buffer = state.execute(ShaderContext::default());
         assert!(raw_buffer.iter().all(|pixel| pixel == &[0, 255, 0, 255]));
-    }
-
-    #[test]
-    fn cpu_backend() {
-        fn red(_: u32, _: u32, _: ShaderContext) -> Pixel {
-            [255, 0, 0, 255]
-        }
-        let mut context = CpuBackend::new(red);
-        let raw_buffer = context.execute(ShaderContext::default(), &NoUserData::default());
-        assert!(raw_buffer.iter().all(|pixel| pixel == &[255, 0, 0, 255]));
     }
 
     #[test]
@@ -406,11 +558,7 @@ mod tests {
             .draw(|frame| {
                 frame.render_stateful_widget(
                     ShaderCanvas::new().character_rule(CharacterRule::Map(|sample| {
-                        if sample.x() == 0 {
-                            ' '
-                        } else {
-                            '.'
-                        }
+                        if sample.x() == 0 { ' ' } else { '.' }
                     })),
                     frame.area(),
                     &mut state,

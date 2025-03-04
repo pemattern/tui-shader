@@ -1,19 +1,12 @@
-use std::{fs, marker::PhantomData};
-
 use pollster::FutureExt as _;
 use wgpu::util::DeviceExt;
 
 use crate::{Pixel, ShaderContext};
 
-use super::{NoUserData, TuiShaderBackend};
-
 const DEFAULT_SIZE: u32 = 64;
 
 #[derive(Debug, Clone)]
-pub struct WgpuBackend<T>
-where
-    T: Copy + Clone + Default + bytemuck::Pod + bytemuck::Zeroable,
-{
+pub struct ShaderCanvasState {
     device: wgpu::Device,
     queue: wgpu::Queue,
     pipeline: wgpu::RenderPipeline,
@@ -23,86 +16,33 @@ where
     bind_group: wgpu::BindGroup,
     width: u32,
     height: u32,
-    _user_data: PhantomData<T>,
 }
 
-impl<T> WgpuBackend<T>
-where
-    T: Copy + Clone + Default + bytemuck::Pod + bytemuck::Zeroable,
-{
-    pub fn new(path_to_fragment_shader: &str, entry_point: &str) -> Self {
-        Self::new_inner(path_to_fragment_shader, entry_point).block_on()
+impl ShaderCanvasState {
+    pub fn new<'a, S: Into<wgpu::ShaderModuleDescriptor<'a>>>(shader: S) -> Self {
+        Self::new_inner(shader.into(), None).block_on()
     }
 
-    async fn get_device_and_queue() -> (wgpu::Device, wgpu::Queue) {
-        let instance = wgpu::Instance::default();
-
-        let adapter = instance
-            .request_adapter(&wgpu::RequestAdapterOptions::default())
-            .await
-            .expect("unable to create adapter from wgpu instance");
-
-        let device_and_queue = adapter
-            .request_device(
-                &wgpu::DeviceDescriptor {
-                    label: None,
-                    required_features: wgpu::Features::empty(),
-                    required_limits: wgpu::Limits::downlevel_defaults(),
-                    memory_hints: wgpu::MemoryHints::Performance,
-                },
-                None,
-            )
-            .await
-            .expect("unable to create device and queue from wgpu adapter");
-        device_and_queue
+    pub fn new_with_entry_point<'a, S: Into<wgpu::ShaderModuleDescriptor<'a>>>(
+        shader: S,
+        entry_point: &'a str,
+    ) -> Self {
+        Self::new_inner(shader.into(), Some(entry_point)).block_on()
     }
 
-    fn create_texture(device: &wgpu::Device, width: u32, height: u32) -> wgpu::Texture {
-        let texture_desc = wgpu::TextureDescriptor {
-            size: wgpu::Extent3d {
-                width,
-                height,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8Unorm,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
-            label: None,
-            view_formats: &[wgpu::TextureFormat::Rgba8Unorm],
-        };
-        device.create_texture(&texture_desc)
-    }
-
-    fn create_buffer(device: &wgpu::Device, width: u32, height: u32) -> wgpu::Buffer {
-        let row_size = width * 4;
-        let bytes_per_row = (row_size + 255) & !255;
-
-        device.create_buffer(&wgpu::BufferDescriptor {
-            label: None,
-            size: (bytes_per_row * height) as wgpu::BufferAddress,
-            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
-            mapped_at_creation: false,
-        })
-    }
-
-    async fn new_inner(path_to_fragment_shader: &str, entry_point: &str) -> Self {
-        let (device, queue) = Self::get_device_and_queue().await;
+    async fn new_inner<'a>(
+        desc: wgpu::ShaderModuleDescriptor<'a>,
+        entry_point: Option<&str>,
+    ) -> Self {
+        let (device, queue) = get_device_and_queue().await;
 
         let vertex_shader =
-            device.create_shader_module(wgpu::include_wgsl!("../shaders/fullscreen_vertex.wgsl"));
+            device.create_shader_module(wgpu::include_wgsl!("shaders/fullscreen_vertex.wgsl"));
 
-        let fragment_shader_source =
-            fs::read_to_string(path_to_fragment_shader).expect("Unable to read fragment shader");
+        let fragment_shader = device.create_shader_module(desc);
 
-        let fragment_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: None,
-            source: wgpu::ShaderSource::Wgsl(fragment_shader_source.into()),
-        });
-
-        let texture = Self::create_texture(&device, DEFAULT_SIZE, DEFAULT_SIZE);
-        let output_buffer = Self::create_buffer(&device, DEFAULT_SIZE, DEFAULT_SIZE);
+        let texture = create_texture(&device, DEFAULT_SIZE, DEFAULT_SIZE);
+        let output_buffer = create_buffer(&device, DEFAULT_SIZE, DEFAULT_SIZE);
 
         let ctx_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: None,
@@ -110,58 +50,30 @@ where
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
-        let user_data_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: None,
-            contents: bytemuck::cast_slice(&[T::default()]),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        });
-
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
+            entries: &[wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
                 },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-            ],
+                count: None,
+            }],
             label: None,
         });
 
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: &bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                        buffer: &ctx_buffer,
-                        offset: 0,
-                        size: None,
-                    }),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                        buffer: &user_data_buffer,
-                        offset: 0,
-                        size: None,
-                    }),
-                },
-            ],
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                    buffer: &ctx_buffer,
+                    offset: 0,
+                    size: None,
+                }),
+            }],
             label: None,
         });
 
@@ -182,7 +94,7 @@ where
             },
             fragment: Some(wgpu::FragmentState {
                 module: &fragment_shader,
-                entry_point: Some(entry_point),
+                entry_point,
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
                 targets: &[Some(wgpu::ColorTargetState {
                     format: wgpu::TextureFormat::Rgba8Unorm,
@@ -197,7 +109,7 @@ where
             cache: None,
         });
 
-        WgpuBackend {
+        ShaderCanvasState {
             device,
             queue,
             pipeline,
@@ -207,16 +119,19 @@ where
             bind_group,
             width: DEFAULT_SIZE.into(),
             height: DEFAULT_SIZE.into(),
-            _user_data: PhantomData,
         }
     }
 
-    async fn execute_inner(&mut self, ctx: ShaderContext, _user_data: &T) -> Vec<Pixel> {
+    fn execute(&mut self, ctx: ShaderContext) -> Vec<Pixel> {
+        self.execute_inner(ctx).block_on()
+    }
+
+    async fn execute_inner(&mut self, ctx: ShaderContext) -> Vec<Pixel> {
         let width = ctx.resolution[0];
         let height = ctx.resolution[1];
         if bytes_per_row(width) != bytes_per_row(self.width) || height != self.height {
-            self.texture = Self::create_texture(&self.device, width, height);
-            self.output_buffer = Self::create_buffer(&self.device, width, height);
+            self.texture = create_texture(&self.device, width, height);
+            self.output_buffer = create_buffer(&self.device, width, height);
         }
         let bytes_per_row = bytes_per_row(width);
         let texture_view = self
@@ -301,18 +216,9 @@ where
     }
 }
 
-impl<T> TuiShaderBackend<T> for WgpuBackend<T>
-where
-    T: Copy + Clone + Default + bytemuck::Pod + bytemuck::Zeroable,
-{
-    fn execute(&mut self, ctx: ShaderContext, user_data: &T) -> Vec<Pixel> {
-        self.execute_inner(ctx, user_data).block_on()
-    }
-}
-
-impl Default for WgpuBackend<NoUserData> {
+impl Default for ShaderCanvasState {
     fn default() -> Self {
-        Self::new("src/shaders/default_fragment.wgsl", "magenta")
+        Self::new(wgpu::include_wgsl!("shaders/default_fragment.wgsl"))
     }
 }
 
@@ -325,4 +231,57 @@ fn row_padding(width: u32) -> u32 {
     let row_size = width * 4;
     let bytes_per_row = bytes_per_row(width);
     (bytes_per_row - row_size) / 4
+}
+
+async fn get_device_and_queue() -> (wgpu::Device, wgpu::Queue) {
+    let instance = wgpu::Instance::default();
+
+    let adapter = instance
+        .request_adapter(&wgpu::RequestAdapterOptions::default())
+        .await
+        .expect("unable to create adapter from wgpu instance");
+
+    let device_and_queue = adapter
+        .request_device(
+            &wgpu::DeviceDescriptor {
+                label: None,
+                required_features: wgpu::Features::empty(),
+                required_limits: wgpu::Limits::downlevel_defaults(),
+                memory_hints: wgpu::MemoryHints::Performance,
+            },
+            None,
+        )
+        .await
+        .expect("unable to create device and queue from wgpu adapter");
+    device_and_queue
+}
+
+fn create_texture(device: &wgpu::Device, width: u32, height: u32) -> wgpu::Texture {
+    let texture_desc = wgpu::TextureDescriptor {
+        size: wgpu::Extent3d {
+            width,
+            height,
+            depth_or_array_layers: 1,
+        },
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: wgpu::TextureFormat::Rgba8Unorm,
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+        label: None,
+        view_formats: &[wgpu::TextureFormat::Rgba8Unorm],
+    };
+    device.create_texture(&texture_desc)
+}
+
+fn create_buffer(device: &wgpu::Device, width: u32, height: u32) -> wgpu::Buffer {
+    let row_size = width * 4;
+    let bytes_per_row = (row_size + 255) & !255;
+
+    device.create_buffer(&wgpu::BufferDescriptor {
+        label: None,
+        size: (bytes_per_row * height) as wgpu::BufferAddress,
+        usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+        mapped_at_creation: false,
+    })
 }

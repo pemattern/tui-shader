@@ -3,7 +3,8 @@ const LIGHT_COLOR: ratatui::style::Color = ratatui::style::Color::Rgb(215, 222, 
 
 fn main() {
     let mut terminal = ratatui::init();
-    let mut state = tui_shader::ShaderCanvasState::wgpu("shaders/dither.wgsl", "main");
+    let mut state =
+        tui_shader::ShaderCanvasState::new(wgpu::include_wgsl!("../../shaders/dither.wgsl"));
     const STYLE_RULE: tui_shader::StyleRule = tui_shader::StyleRule::Map(|sample| {
         if sample.r() > 127 {
             ratatui::style::Style::new().fg(DARK_COLOR).bg(LIGHT_COLOR)
@@ -11,17 +12,14 @@ fn main() {
             ratatui::style::Style::new().fg(LIGHT_COLOR).bg(DARK_COLOR)
         }
     });
+    let canvas = tui_shader::ShaderCanvas::new().style_rule(STYLE_RULE);
 
     let start_time = std::time::Instant::now();
     // run at 128x32 cells
     while start_time.elapsed().as_secs() < 20 {
         terminal
             .draw(|frame| {
-                frame.render_stateful_widget(
-                    tui_shader::ShaderCanvas::new().style_rule(STYLE_RULE),
-                    frame.area(),
-                    &mut state,
-                );
+                frame.render_stateful_widget(&canvas, frame.area(), &mut state);
                 frame.render_widget(
                     tui_big_text::BigText::builder()
                         .pixel_size(tui_big_text::PixelSize::Full)
