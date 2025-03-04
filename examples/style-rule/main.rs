@@ -1,9 +1,6 @@
 pub fn main() -> std::io::Result<()> {
     let mut terminal = ratatui::init();
-    let mut state = tui_shader::ShaderCanvasState::new(
-        wgpu::include_wgsl!("../../shaders/gradient.wgsl"),
-        None,
-    );
+    let mut state = tui_shader::ShaderCanvasState::wgpu("shaders/gradient.wgsl", "main");
     const STYLE_RULE: tui_shader::StyleRule = tui_shader::StyleRule::Map(|sample| {
         let color = ratatui::style::Color::Rgb(sample.r(), sample.g(), sample.b());
         let sum = sample.r() as u16 + sample.g() as u16 + sample.b() as u16;

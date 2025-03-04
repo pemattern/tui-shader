@@ -3,7 +3,7 @@ name = "tui-shader"
 authors = ["Paul Mattern <mail@paulmattern.dev>"]
 documentation = "https://docs.rs/tui-shader/latest/tui_shader/"
 version = "0.0.7"
-edition = "2024"
+edition = "2021"
 categories = ["graphics", "rendering", "gui"]
 description = "A ratatui widget that renders a fragment shader in the terminal"
 homepage = "https://github.com/pemattern/tui-shader"
@@ -11,7 +11,7 @@ repository = "https://github.com/pemattern/tui-shader"
 keywords = ["tui", "shader", "wgpu", "terminal", "graphics"]
 license = "MIT OR Apache-2.0"
 readme = "README.md"
-rust-version = "1.85.0"
+rust-version = "1.83.0"
 exclude = ["assets/", ".github/"]
 
 [dependencies]

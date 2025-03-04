@@ -2,12 +2,8 @@ use ratatui::style::Stylize;
 
 pub fn main() -> std::io::Result<()> {
     let mut terminal = ratatui::init();
-    let mut fg_shader_state =
-        tui_shader::ShaderCanvasState::new(wgpu::include_wgsl!("../../shaders/voronoi.wgsl"), None);
-    let mut bg_shader_state = tui_shader::ShaderCanvasState::new(
-        wgpu::include_wgsl!("../../shaders/starlight.wgsl"),
-        None,
-    );
+    let mut fg_shader_state = tui_shader::ShaderCanvasState::wgpu("shaders/voronoi.wgsl", "main");
+    let mut bg_shader_state = tui_shader::ShaderCanvasState::wgpu("shaders/starlight.wgsl", "main");
     let mut list_state = ratatui::widgets::ListState::default();
     *list_state.selected_mut() = Some(5);
     let start_time = std::time::Instant::now();
