@@ -17,11 +17,11 @@
 //!
 //! ```rust,no_run
 //! let mut terminal = ratatui::init();
-//! let mut state = tui_shader::ShaderCanvasState::default();
+//! let mut state = tui_shader::ShaderState::default();
 //! let start_time = std::time::Instant::now();
 //! while start_time.elapsed().as_secs() < 5 {
 //!     terminal.draw(|frame| {
-//!         frame.render_stateful_widget(tui_shader::ShaderCanvas::new(), frame.area(), &mut state);
+//!         frame.render_stateful_widget(tui_shader::Shader::new(), frame.area(), &mut state);
 //!     }).unwrap();
 //! }
 //! ratatui::restore();
@@ -36,15 +36,15 @@ use wgpu::util::DeviceExt;
 
 const DEFAULT_SIZE: u32 = 64;
 
-/// `ShaderCanvas` is a unit struct which implements the `StatefulWidget` trait from Ratatui.
+/// `Shader` is a struct which implements the `StatefulWidget` trait from Ratatui.
 /// It holds the logic for applying the result of GPU computation to the `Buffer` struct which
 /// Ratatui uses to display to the terminal.
 ///
 /// ```rust,no_run
 /// let mut terminal = ratatui::init();
-/// let mut state = tui_shader::ShaderCanvasState::default();
+/// let mut state = tui_shader::ShaderState::default();
 /// terminal.draw(|frame| {
-///     frame.render_stateful_widget(tui_shader::ShaderCanvas::new()
+///     frame.render_stateful_widget(tui_shader::Shader::new()
 ///         .style_rule(tui_shader::StyleRule::ColorFg),
 ///         frame.area(),
 ///         &mut state);
@@ -53,13 +53,13 @@ const DEFAULT_SIZE: u32 = 64;
 /// ```
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct ShaderCanvas {
+pub struct Shader {
     pub character_rule: CharacterRule,
     pub style_rule: StyleRule,
 }
 
-impl ShaderCanvas {
-    /// Creates a new instance of [`ShaderCanvas`].
+impl Shader {
+    /// Creates a new instance of [`Shader`].
     pub fn new() -> Self {
         Self {
             character_rule: CharacterRule::default(),
@@ -67,14 +67,14 @@ impl ShaderCanvas {
         }
     }
 
-    /// Applies a [`CharacterRule`] to a [`ShaderCanvas`].
+    /// Applies a [`CharacterRule`] to a [`Shader`].
     #[must_use]
     pub fn character_rule(mut self, character_rule: CharacterRule) -> Self {
         self.character_rule = character_rule;
         self
     }
 
-    /// Applies a [`StyleRule`] to a [`ShaderCanvas`].
+    /// Applies a [`StyleRule`] to a [`Shader`].
     #[must_use]
     pub fn style_rule(mut self, style_rule: StyleRule) -> Self {
         self.style_rule = style_rule;
@@ -82,21 +82,21 @@ impl ShaderCanvas {
     }
 }
 
-impl Default for ShaderCanvas {
+impl Default for Shader {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl StatefulWidget for ShaderCanvas {
-    type State = ShaderCanvasState;
+impl StatefulWidget for Shader {
+    type State = ShaderState;
     fn render(self, area: Rect, buf: &mut ratatui::prelude::Buffer, state: &mut Self::State) {
         StatefulWidget::render(&self, area, buf, state);
     }
 }
 
-impl StatefulWidget for &ShaderCanvas {
-    type State = ShaderCanvasState;
+impl StatefulWidget for &Shader {
+    type State = ShaderState;
     fn render(self, area: Rect, buf: &mut ratatui::buffer::Buffer, state: &mut Self::State) {
         let width = area.width;
         let height = area.height;
@@ -131,7 +131,7 @@ impl StatefulWidget for &ShaderCanvas {
 }
 
 #[derive(Debug, Clone)]
-pub struct ShaderCanvasState {
+pub struct ShaderState {
     device: wgpu::Device,
     queue: wgpu::Queue,
     pipeline: wgpu::RenderPipeline,
@@ -144,7 +144,7 @@ pub struct ShaderCanvasState {
     height: u32,
 }
 
-impl ShaderCanvasState {
+impl ShaderState {
     pub fn new<'a, S: Into<wgpu::ShaderModuleDescriptor<'a>>>(shader: S) -> Self {
         Self::new_inner(shader.into(), None).block_on()
     }
@@ -235,7 +235,7 @@ impl ShaderCanvasState {
             cache: None,
         });
 
-        ShaderCanvasState {
+        ShaderState {
             device,
             queue,
             pipeline,
@@ -348,7 +348,7 @@ impl ShaderCanvasState {
     }
 }
 
-impl Default for ShaderCanvasState {
+impl Default for ShaderState {
     fn default() -> Self {
         Self::new(wgpu::include_wgsl!("shaders/default_fragment.wgsl"))
     }
@@ -448,7 +448,7 @@ impl Default for ShaderContext {
 }
 
 /// Determines which character to use for Cell.
-/// [`CharacterRule::Always`] takes a single char and applies it to all Cells in the [`ShaderCanvas`].
+/// [`CharacterRule::Always`] takes a single char and applies it to all Cells in the [`Shader`].
 /// [`CharacterRule::Map`] takes a function as an argument and allows you to map the input [`Sample`] to
 /// a character. For example, one might use the transparency value from the shader ([Sample::a]) and map
 /// it to a different character depending on the value.
@@ -535,14 +535,14 @@ mod tests {
 
     #[test]
     fn default_state() {
-        let mut state = ShaderCanvasState::default();
+        let mut state = ShaderState::default();
         let raw_buffer = state.execute(ShaderContext::default());
         assert!(raw_buffer.iter().all(|pixel| pixel == &[255, 0, 255, 255]));
     }
 
     #[test]
     fn different_entry_points() {
-        let mut state = ShaderCanvasState::new_with_entry_point(
+        let mut state = ShaderState::new_with_entry_point(
             wgpu::include_wgsl!("shaders/test_fragment.wgsl"),
             "green",
         );
@@ -553,11 +553,11 @@ mod tests {
     #[test]
     fn character_rule_map() {
         let mut terminal = ratatui::Terminal::new(TestBackend::new(64, 64)).unwrap();
-        let mut state = ShaderCanvasState::default();
+        let mut state = ShaderState::default();
         terminal
             .draw(|frame| {
                 frame.render_stateful_widget(
-                    ShaderCanvas::new().character_rule(CharacterRule::Map(|sample| {
+                    Shader::new().character_rule(CharacterRule::Map(|sample| {
                         if sample.x() == 0 { ' ' } else { '.' }
                     })),
                     frame.area(),

@@ -1,7 +1,7 @@
 pub fn main() -> std::io::Result<()> {
     let mut terminal = ratatui::init();
     let mut state =
-        tui_shader::ShaderCanvasState::new(wgpu::include_wgsl!("../../shaders/gradient.wgsl"));
+        tui_shader::ShaderState::new(wgpu::include_wgsl!("../../shaders/gradient.wgsl"));
     const STYLE_RULE: tui_shader::StyleRule = tui_shader::StyleRule::Map(|sample| {
         let color = ratatui::style::Color::Rgb(sample.r(), sample.g(), sample.b());
         let sum = sample.r() as u16 + sample.g() as u16 + sample.b() as u16;
@@ -35,7 +35,7 @@ pub fn main() -> std::io::Result<()> {
     loop {
         terminal.draw(|frame| {
             frame.render_stateful_widget(
-                tui_shader::ShaderCanvas::new().style_rule(STYLE_RULE),
+                tui_shader::Shader::new().style_rule(STYLE_RULE),
                 frame.area(),
                 &mut state,
             );

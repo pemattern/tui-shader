@@ -6,12 +6,12 @@ pub fn main() -> std::io::Result<()> {
     }
     let mut terminal = ratatui::init();
     let mut state =
-        tui_shader::ShaderCanvasState::new(wgpu::include_wgsl!("../../shaders/gradient.wgsl"));
+        tui_shader::ShaderState::new(wgpu::include_wgsl!("../../shaders/gradient.wgsl"));
     let start_time = std::time::Instant::now();
     while start_time.elapsed().as_secs() < 7 {
         terminal.draw(|frame| {
             frame.render_stateful_widget(
-                tui_shader::ShaderCanvas::new().style_rule(tui_shader::StyleRule::ColorFg),
+                tui_shader::Shader::new().style_rule(tui_shader::StyleRule::ColorFg),
                 frame.area(),
                 &mut state,
             );
