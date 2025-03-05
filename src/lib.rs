@@ -16,10 +16,10 @@
 //! Then create a new application:
 //!
 //! ```rust,no_run
+//! # use tui_shader::{Shader, ShaderState};
 //! let mut terminal = ratatui::init();
-//! let mut state = tui_shader::ShaderState::default();
-//! let start_time = std::time::Instant::now();
-//! while start_time.elapsed().as_secs() < 5 {
+//! let mut state = ShaderState::default();
+//! while state.get_instant().elapsed().as_secs() < 5 {
 //!     terminal.draw(|frame| {
 //!         frame.render_stateful_widget(tui_shader::Shader::new(), frame.area(), &mut state);
 //!     }).unwrap();
@@ -41,11 +41,12 @@ const DEFAULT_SIZE: u32 = 64;
 /// Ratatui uses to display to the terminal.
 ///
 /// ```rust,no_run
+/// # use tui_shader::{Shader, ShaderState, StyleRule};
 /// let mut terminal = ratatui::init();
-/// let mut state = tui_shader::ShaderState::default();
+/// let mut state = ShaderState::default();
 /// terminal.draw(|frame| {
-///     frame.render_stateful_widget(tui_shader::Shader::new()
-///         .style_rule(tui_shader::StyleRule::ColorFg),
+///     frame.render_stateful_widget(Shader::new()
+///         .style_rule(StyleRule::ColorFg),
 ///         frame.area(),
 ///         &mut state);
 /// }).unwrap();
@@ -106,7 +107,8 @@ impl StatefulWidget for &Shader {
 
         for y in 0..height {
             for x in 0..width {
-                let index = (y * width + x) as usize;
+                let index = (y * (width + row_padding(width.into()) as u16) + x) as usize;
+                // let index = (y * width + x) as usize;
                 let value = samples[index];
                 let position = (x, y);
                 let character = match self.character_rule {
@@ -249,6 +251,10 @@ impl ShaderState {
         }
     }
 
+    pub fn get_instant(&self) -> Instant {
+        self.instant
+    }
+
     fn execute(&mut self, ctx: ShaderContext) -> Vec<Pixel> {
         self.execute_inner(ctx).block_on()
     }
@@ -330,16 +336,7 @@ impl ShaderState {
             let view = buffer_slice.get_mapped_range();
             padded_buffer = bytemuck::cast_slice(&view).to_vec();
         }
-        self.output_buffer.unmap();
-        let mut buffer: Vec<Pixel> = Vec::new();
-        for y in 0..height {
-            for x in 0..width {
-                let index = (y * (width + row_padding(width)) + x) as usize;
-                let pixel = padded_buffer[index];
-                buffer.push(pixel);
-            }
-        }
-        buffer
+        padded_buffer
     }
 
     pub fn instant(mut self, instant: Instant) -> Self {
