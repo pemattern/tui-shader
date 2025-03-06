@@ -21,13 +21,76 @@
 //! let mut state = ShaderState::default();
 //! while state.get_instant().elapsed().as_secs() < 5 {
 //!     terminal.draw(|frame| {
-//!         frame.render_stateful_widget(tui_shader::Shader::new(), frame.area(), &mut state);
+//!         frame.render_stateful_widget(Shader::new(), frame.area(), &mut state);
 //!     }).unwrap();
 //! }
 //! ratatui::restore();
 //! ```
+//!
+//! And run it
+//! ```shell
+//! cargo run
+//! ```
+//!
+//! Well that was lame. Where are all the cool shader-y effects?
+//! We haven't actually provided a shader that the application should use so our [`ShaderState`]
+//! uses a default shader, which always returns the magenta color. This happends because we created it
+//! using [`ShaderState::default()`]. Now, let's write a `wgsl` shader and render some fancy stuff
+//! in the terminal.
+//!
+//! ```wgsl
+//! struct Context {
+//!    time: f32,
+//! }
+//!
+//! @group(0) @binding(0) var<uniform> input: Context;
+//!
+//! @fragment
+//! fn main(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
+//!     let x = sin(1.0 - uv.x + input.time);
+//!     let y = cos(1.0 - uv.y + input.time);
+//!
+//!     return vec4<f32>(x, 0.5, y, 1.0);
+//! }
+//! ```
+//!
+//! Ok, there's a lot to `unwrap` here. At first we define a `struct` that has a `time` field of type `f32`.
+//! The `time` field is filled with data out-of-the-box by our [`ShaderState`] and can be used in any shader.
+//! The important thing to note is that it isn't the name of the field that's important, it's the position in
+//! the struct that determines which data we are reading from it. The `Context` struct will always take the
+//! same shape as [`ShaderContext`].
+//!
+//! Next, we declare a variable `input` of type `Context` which reads the data at `@group(0) @binding(0)`.
+//!
+//! Finally - and this is were the magic happens - we can define our function for
+//! manipulating colors. We must denote our function with `@fragment` because we are writing a fragment shader. As
+//! long as we only define a single `@fragment` function in our file, we can name it whatever we want. Otherwise, we
+//! must use [`ShaderState::new_with_entry_point`] and pass in the name of the desired `@fragment` function.
+//! A vertex shader cannot be provided for [`ShaderState`] as is always uses a single triangle, full-screen vertex
+//! shader.
+//!
+//! We can use the UV coordinates provided by the vertex shader with `@location(0) uv: vec2<f32>`.
+//! Now we have time and UV coordinates to work with to create amazing shaders. This shader just
+//! does some math with these values and returns a new color. Time to get creative!
+//!
+//! Now, all we need to do is create our [`ShaderState`] using [`ShaderState::new`] and pass in our shader.
+//!
+//! ```rust,no_run
+//! # use tui_shader::{Shader, ShaderState, WgslShader};
+//! let mut terminal = ratatui::init();
+//! let mut state = ShaderState::new(WgslShader::Path("shader.wgsl"));
+//! while state.get_instant().elapsed().as_secs() < 5 {
+//!     terminal.draw(|frame| {
+//!         frame.render_stateful_widget(Shader::new(), frame.area(), &mut state);
+//!     }).unwrap();
+//! }
+//! ratatui::restore();
+//! ```
+//!
+//! Now that's more like it!
 
 use pollster::FutureExt as _;
+use ratatui::buffer::Buffer;
 use ratatui::layout::{Position, Rect};
 use ratatui::style::{Color, Style};
 use ratatui::widgets::StatefulWidget;
@@ -36,8 +99,8 @@ use wgpu::util::DeviceExt;
 
 const DEFAULT_SIZE: u32 = 64;
 
-/// `Shader` is a struct which implements the `StatefulWidget` trait from Ratatui.
-/// It holds the logic for applying the result of GPU computation to the `Buffer` struct which
+/// [`Shader`] implements the [`StatefulWidget`] trait from Ratatui.
+/// It holds the logic for applying the result of GPU computation to the [`Buffer`] struct which
 /// Ratatui uses to display to the terminal.
 ///
 /// ```rust,no_run
@@ -45,14 +108,12 @@ const DEFAULT_SIZE: u32 = 64;
 /// let mut terminal = ratatui::init();
 /// let mut state = ShaderState::default();
 /// terminal.draw(|frame| {
-///     frame.render_stateful_widget(Shader::new()
-///         .style_rule(StyleRule::ColorFg),
+///     frame.render_stateful_widget(Shader::new(),
 ///         frame.area(),
 ///         &mut state);
 /// }).unwrap();
 /// ratatui::restore();
 /// ```
-
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Shader {
     pub character_rule: CharacterRule,
@@ -60,7 +121,7 @@ pub struct Shader {
 }
 
 impl Shader {
-    /// Creates a new instance of [`Shader`].
+    /// Creates a new instance of [`Shader`]. Equivalent to [`Shader::default()`]
     pub fn new() -> Self {
         Self {
             character_rule: CharacterRule::default(),
@@ -91,14 +152,14 @@ impl Default for Shader {
 
 impl StatefulWidget for Shader {
     type State = ShaderState;
-    fn render(self, area: Rect, buf: &mut ratatui::prelude::Buffer, state: &mut Self::State) {
+    fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
         StatefulWidget::render(&self, area, buf, state);
     }
 }
 
 impl StatefulWidget for &Shader {
     type State = ShaderState;
-    fn render(self, area: Rect, buf: &mut ratatui::buffer::Buffer, state: &mut Self::State) {
+    fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
         let width = area.width;
         let height = area.height;
         let time = state.instant.elapsed().as_secs_f32();
@@ -108,7 +169,6 @@ impl StatefulWidget for &Shader {
         for y in 0..height {
             for x in 0..width {
                 let index = (y * (width + row_padding(width.into()) as u16) + x) as usize;
-                // let index = (y * width + x) as usize;
                 let value = samples[index];
                 let position = (x, y);
                 let character = match self.character_rule {
@@ -131,6 +191,9 @@ impl StatefulWidget for &Shader {
         }
     }
 }
+
+/// [`ShaderState`] holds the state to execute a render pass. It handles window/widget resizing automatically
+/// and creates new textures and buffers when necessary.
 
 #[derive(Debug, Clone)]
 pub struct ShaderState {
@@ -523,6 +586,29 @@ impl Sample {
 }
 
 pub type Pixel = [u8; 4];
+
+pub enum WgslShader<'a> {
+    Source(&'a str),
+    Path(&'a str),
+}
+
+impl<'a> From<WgslShader<'a>> for wgpu::ShaderModuleDescriptor<'a> {
+    fn from(value: WgslShader<'a>) -> Self {
+        match value {
+            WgslShader::Source(source) => wgpu::ShaderModuleDescriptor {
+                label: None,
+                source: wgpu::ShaderSource::Wgsl(source.into()),
+            },
+            WgslShader::Path(path) => {
+                let source = std::fs::read_to_string(path).expect("unable to read file");
+                wgpu::ShaderModuleDescriptor {
+                    label: None,
+                    source: wgpu::ShaderSource::Wgsl(source.into()),
+                }
+            }
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
