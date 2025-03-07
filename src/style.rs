@@ -5,7 +5,7 @@ use crate::Pixel;
 /// Determines which character to use for Cell.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum CharacterRule {
-    /// [`CharacterRule::Always`] takes a single char and applies it to all Cells in the [`ShaderCanvas`].
+    /// [`CharacterRule::Always`] takes a single char and applies it to all cells.
     Always(char),
 
     /// [`CharacterRule::Map`] takes a function as an argument and allows you to map the input [`Sample`] to
@@ -16,10 +16,10 @@ pub enum CharacterRule {
     /// ```rust,no_run
     /// # use tui_shader::{CharacterRule, ShaderCanvas, StyleRule};
     /// let char_map = CharacterRule::Map(|sample| {
-    ///     if (sample.r() > 127) {
+    ///     if sample.r() > 127 {
     ///         '@'
     ///     } else {
-    ///         'o'
+    ///         ' '
     ///     }
     /// });
     ///
@@ -57,7 +57,7 @@ pub enum StyleRule {
     /// # use ratatui::style::{Style, Stylize};
     /// let style_map = StyleRule::Map(|sample| {
     ///     let style = Style::new().bg(sample.color());
-    ///     if (sample.u() > 0.5) {
+    ///     if sample.u() > 0.5 {
     ///         style
     ///     } else {
     ///         style.reversed()

@@ -41,38 +41,30 @@
 //! in the terminal.
 //!
 //! ```wgsl
-//! struct Context {
-//!    time: f32,
-//! }
-//!
-//! @group(0) @binding(0) var<uniform> input: Context;
+//! @group(0) @binding(0) var<uniform> time: f32;
 //!
 //! @fragment
 //! fn main(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
-//!     let x = sin(1.0 - uv.x + input.time);
-//!     let y = cos(1.0 - uv.y + input.time);
-//!
+//!     let r = sin(1.0 - uv.x + time);
+//!     let g = cos(1.0 - uv.y + time);
 //!     let b = 0.5;
-
 //!     let d = 1.0 - distance(vec2<f32>(0.5), uv);
 //!     let color = vec4<f32>(r, g, b, 1.0) * d;
 //!     return color;
 //! }
 //! ```
 //!
-//! Ok, there's a lot to `unwrap` here. At first we define a `struct` that has a `time` field of type `f32`.
+//! Ok, there's a lot to `unwrap` here. At first we define a `uniform` `time` of type `f32`.
 //! The `time` field is filled with data out-of-the-box by our [`ShaderCanvasState`] and can be used in any shader.
-//! The important thing to note is that it isn't the name of the field that's important, it's the position in
-//! the struct that determines which data we are reading from it.
-//!
-//! Next, we declare a variable `input` of type `Context` which reads the data at `@group(0) @binding(0)`.
+//! The important thing to note is that it isn't the name of the field that's important, it's the `@group` and `@binding`
+//! attributes that determine which data we are reading from it.
 //!
 //! Finally - and this is were the magic happens - we can define our function for
 //! manipulating colors. We must denote our function with `@fragment` because we are writing a fragment shader. As
 //! long as we only define a single `@fragment` function in our file, we can name it whatever we want. Otherwise, we
-//! must create our [`ShaderCanvasState`] using [`ShaderCanvasState::new_with_entry_point`] and pass in the name of the desired `@fragment` function.
-//! A vertex shader cannot be provided as is always uses a single triangle, full-screen vertex
-//! shader.
+//! must create our [`ShaderCanvasState`] using [`ShaderCanvasState::new_with_entry_point`] and pass in the name of
+//! the desired `@fragment` function. A vertex shader cannot be provided as it always uses a single triangle, full-screen
+//! vertex shader.
 //!
 //! We can use the UV coordinates provided by the vertex shader with `@location(0) uv: vec2<f32>`.
 //! Now we have time and UV coordinates to work with to create amazing shaders. This shader just
@@ -96,6 +88,17 @@
 //! ```
 //!
 //! Now that's more like it!
+//!
+//! ## Shader Input Parameters
+//!
+//! There a few input parameters that are setup out-of-the-box for use in `tui-shader`:
+//!
+//! | Input    | Type        | Binding                 | Explanation                                                                       |
+//! |----------|-------------|-------------------------|-----------------------------------------------------------------------------------|
+//! | Time     | `vec4<f32>` | `@group(0) @binding(0)` | x: time in seconds as `f32`, y: `time.x * 10`, z: `sin(time.x)`, w: `cos(time.x)` |
+//! | Rect     | `vec4<u32>` | `@group(0) @binding(1)` | x: x position of rect, y: y position of rect, z: width, w: height                 |
+//! | UV       | `vec2<f32>` | `@location(0)`          | x: normalized x coordinate y: norimalized y coordinate                            |
+//! | Position | `vec4<f32>` | `@builtin(position)`    | x: absolute x position y: absolute y position z/w: useless in `tui-shader`        |
 
 mod canvas;
 mod context;
