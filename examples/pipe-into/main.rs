@@ -5,7 +5,7 @@ use std::{
 };
 
 use ratatui::widgets::Paragraph;
-use tui_shader::{ShaderState, StyleRule};
+use tui_shader::{ShaderCanvasState, StyleRule};
 use wgpu::include_wgsl;
 
 pub fn main() -> Result<()> {
@@ -15,12 +15,12 @@ pub fn main() -> Result<()> {
         Read::read_to_string(&mut stdin_lock, &mut s).unwrap();
     }
     let mut terminal = ratatui::init();
-    let mut state = ShaderState::new(include_wgsl!("../../shaders/gradient.wgsl"));
+    let mut state = ShaderCanvasState::new(include_wgsl!("../../shaders/gradient.wgsl"));
     let start_time = Instant::now();
     while start_time.elapsed().as_secs() < 7 {
         terminal.draw(|frame| {
             frame.render_stateful_widget(
-                tui_shader::Shader::new().style_rule(StyleRule::ColorFg),
+                tui_shader::ShaderCanvas::new().style_rule(StyleRule::ColorFg),
                 frame.area(),
                 &mut state,
             );

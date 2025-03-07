@@ -42,5 +42,9 @@ name = "pipe-into"
 path = "examples/pipe-into/main.rs"
 
 [[example]]
+name = "tutorial"
+path = "examples/tutorial/main.rs"
+
+[[example]]
 name = "stylize-other-widget"
 path = "examples/stylize-other-widget/main.rs"
