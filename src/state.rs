@@ -5,7 +5,7 @@ use wgpu::util::DeviceExt;
 
 use crate::{Pixel, bytes_per_row, context::ShaderContext};
 
-const DEFAULT_SIZE: u32 = 64;
+pub(crate) const DEFAULT_SIZE: u32 = 64;
 
 /// [`ShaderCanvasState`] holds the state to execute a render pass. It handles window/widget resizing automatically
 /// and creates new textures and buffers when necessary.
@@ -16,7 +16,8 @@ pub struct ShaderCanvasState {
     pipeline: wgpu::RenderPipeline,
     texture: wgpu::Texture,
     output_buffer: wgpu::Buffer,
-    ctx_buffer: wgpu::Buffer,
+    time_buffer: wgpu::Buffer,
+    rect_buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
     instant: Instant,
     width: u32,
@@ -55,36 +56,65 @@ impl ShaderCanvasState {
         let texture = create_texture(&device, DEFAULT_SIZE, DEFAULT_SIZE);
         let output_buffer = create_buffer(&device, DEFAULT_SIZE, DEFAULT_SIZE);
 
-        let ctx_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        let ctx = ShaderContext::default();
+        let time_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: None,
-            contents: bytemuck::cast_slice(&[ShaderContext::default()]),
+            contents: bytemuck::cast_slice(&[ctx.time]),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+
+        let rect_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: None,
+            contents: bytemuck::cast_slice(&[ctx.rect]),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
                 },
-                count: None,
-            }],
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+            ],
             label: None,
         });
 
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: &bind_group_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                    buffer: &ctx_buffer,
-                    offset: 0,
-                    size: None,
-                }),
-            }],
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                        buffer: &time_buffer,
+                        offset: 0,
+                        size: None,
+                    }),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                        buffer: &rect_buffer,
+                        offset: 0,
+                        size: None,
+                    }),
+                },
+            ],
             label: None,
         });
 
@@ -126,7 +156,8 @@ impl ShaderCanvasState {
             pipeline,
             texture,
             output_buffer,
-            ctx_buffer,
+            time_buffer,
+            rect_buffer,
             bind_group,
             instant: Instant::now(),
             width: DEFAULT_SIZE,
@@ -194,7 +225,9 @@ impl ShaderCanvasState {
             },
         );
         self.queue
-            .write_buffer(&self.ctx_buffer, 0, bytemuck::cast_slice(&[ctx]));
+            .write_buffer(&self.time_buffer, 0, bytemuck::cast_slice(&[ctx.time]));
+        self.queue
+            .write_buffer(&self.rect_buffer, 0, bytemuck::cast_slice(&[ctx.rect]));
         self.queue.submit(Some(command_encoder.finish()));
 
         let buffer_slice = self.output_buffer.slice(..);

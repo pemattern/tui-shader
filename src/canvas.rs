@@ -72,7 +72,7 @@ impl StatefulWidget for &ShaderCanvas {
         let width = area.width;
         let height = area.height;
         let time = state.get_instant().elapsed().as_secs_f32();
-        let ctx = ShaderContext::new(time, width, height);
+        let ctx = ShaderContext::new(time, area);
         let samples = state.execute(ctx);
 
         for y in 0..height {
