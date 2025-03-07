@@ -111,6 +111,8 @@ pub use crate::state::*;
 pub use crate::style::*;
 pub use crate::util::*;
 
+pub use wgpu::include_wgsl;
+
 #[cfg(test)]
 mod tests {
     use ratatui::{backend::TestBackend, layout::Position};
