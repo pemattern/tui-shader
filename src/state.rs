@@ -27,18 +27,26 @@ pub struct ShaderCanvasState {
 impl ShaderCanvasState {
     /// Creates a new [`ShaderCanvasState`] instance, without specifying an entry point. This means that
     /// the wgsl shader must define exactly one `@fragment` function.
-    pub fn new<'a, S: Into<wgpu::ShaderModuleDescriptor<'a>>>(shader: S) -> Self {
-        Self::new_inner(shader.into(), None).block_on()
+    pub fn new<'a, S: TryInto<wgpu::ShaderModuleDescriptor<'a>>>(
+        shader: S,
+    ) -> Result<Self, S::Error> {
+        match shader.try_into() {
+            Ok(desc) => Ok(Self::new_inner(desc, None).block_on()),
+            Err(error) => Err(error),
+        }
     }
 
     /// Creates a new [`ShaderCanvasState`] instance with an entry point. This is necessary when your wgsl
     /// shader defines more than one `@fragment` function. In this case, the name of the function must be passed
     /// in.
-    pub fn new_with_entry_point<'a, S: Into<wgpu::ShaderModuleDescriptor<'a>>>(
+    pub fn new_with_entry_point<'a, S: TryInto<wgpu::ShaderModuleDescriptor<'a>>>(
         shader: S,
         entry_point: &'a str,
-    ) -> Self {
-        Self::new_inner(shader.into(), Some(entry_point)).block_on()
+    ) -> Result<Self, S::Error> {
+        match shader.try_into() {
+            Ok(desc) => Ok(Self::new_inner(desc, Some(entry_point)).block_on()),
+            Err(error) => Err(error),
+        }
     }
 
     #[allow(clippy::needless_lifetimes)]
@@ -265,7 +273,7 @@ impl ShaderCanvasState {
 
 impl Default for ShaderCanvasState {
     fn default() -> Self {
-        Self::new(wgpu::include_wgsl!("shaders/default_fragment.wgsl"))
+        Self::new(wgpu::include_wgsl!("shaders/default_fragment.wgsl")).unwrap()
     }
 }
 

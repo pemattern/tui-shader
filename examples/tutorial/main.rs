@@ -5,7 +5,7 @@ fn main() {
     let mut terminal = ratatui::init();
 
     let balloon_shader = WgslShader::Path("shaders/tutorial.wgsl");
-    let mut balloon_state = ShaderCanvasState::new(balloon_shader);
+    let mut balloon_state = ShaderCanvasState::new(balloon_shader).unwrap();
     let balloon_canvas = ShaderCanvas::new().style_rule(tui_shader::StyleRule::Map(|sample| {
         let brightness = (sample.r() as f32 + sample.g() as f32 + sample.b() as f32) / 3.0;
         if brightness > 127.0 {
@@ -16,7 +16,7 @@ fn main() {
     }));
 
     let bg_shader = WgslShader::Path("shaders/gradient.wgsl");
-    let mut bg_state = ShaderCanvasState::new(bg_shader);
+    let mut bg_state = ShaderCanvasState::new(bg_shader).unwrap();
     let bg_canvas = ShaderCanvas::new();
 
     while balloon_state.get_instant().elapsed().as_secs() < 7 {

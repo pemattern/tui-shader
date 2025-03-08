@@ -15,7 +15,7 @@ pub fn main() -> Result<()> {
         Read::read_to_string(&mut stdin_lock, &mut s).unwrap();
     }
     let mut terminal = ratatui::init();
-    let mut state = ShaderCanvasState::new(include_wgsl!("../../shaders/gradient.wgsl"));
+    let mut state = ShaderCanvasState::new(include_wgsl!("../../shaders/gradient.wgsl")).unwrap();
     let start_time = Instant::now();
     while start_time.elapsed().as_secs() < 7 {
         terminal.draw(|frame| {

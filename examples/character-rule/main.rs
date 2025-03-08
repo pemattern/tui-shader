@@ -8,7 +8,8 @@ fn main() {
         .character_rule(char_map)
         .style_rule(StyleRule::ColorFg);
 
-    let mut state = ShaderCanvasState::new(wgpu::include_wgsl!("../../shaders/voronoi.wgsl"));
+    let mut state =
+        ShaderCanvasState::new(wgpu::include_wgsl!("../../shaders/voronoi.wgsl")).unwrap();
 
     while state.get_instant().elapsed().as_secs() < 5 {
         terminal

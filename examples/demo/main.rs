@@ -13,7 +13,7 @@ const LIGHT_COLOR: Color = Color::Rgb(215, 222, 220);
 
 fn main() -> Result<()> {
     let mut terminal = ratatui::init();
-    let mut state = ShaderCanvasState::new(include_wgsl!("../../shaders/dither.wgsl"));
+    let mut state = ShaderCanvasState::new(include_wgsl!("../../shaders/dither.wgsl")).unwrap();
     let style_rule: StyleRule = StyleRule::Map(|sample| {
         if sample.r() > 127 {
             Style::new().fg(DARK_COLOR).bg(LIGHT_COLOR)

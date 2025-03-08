@@ -76,7 +76,7 @@
 //! # use tui_shader::{ShaderCanvas, ShaderCanvasState, WgslShader};
 //! let mut terminal = ratatui::init();
 //! let shader = WgslShader::Path("shader.wgsl");
-//! let mut state = ShaderCanvasState::new(shader);
+//! let mut state = ShaderCanvasState::new(shader).unwrap();
 //! while state.get_instant().elapsed().as_secs() < 5 {
 //!     terminal.draw(|frame| {
 //!         frame.render_stateful_widget(ShaderCanvas::new(),
@@ -131,7 +131,8 @@ mod tests {
         let mut state = ShaderCanvasState::new_with_entry_point(
             wgpu::include_wgsl!("shaders/test_fragment.wgsl"),
             "green",
-        );
+        )
+        .unwrap();
         let raw_buffer = state.execute(ShaderContext::default());
         assert!(raw_buffer.iter().all(|pixel| pixel == &[0, 255, 0, 255]));
     }
