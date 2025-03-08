@@ -92,7 +92,7 @@ impl StatefulWidget for &ShaderCanvas {
                     StyleRule::Map(map) => map(Sample::new(value, position, uv)),
                 };
                 let cell = buf
-                    .cell_mut(Position::new(x, y))
+                    .cell_mut(Position::new(x + area.x, y + area.y))
                     .expect("unable to get cell");
                 cell.set_style(style);
                 cell.set_char(character);
