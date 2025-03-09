@@ -26,7 +26,8 @@ pub struct ShaderCanvasState {
 
 impl ShaderCanvasState {
     /// Creates a new [`ShaderCanvasState`] instance, without specifying an entry point. This means that
-    /// the wgsl shader must define exactly one `@fragment` function.
+    /// the wgsl shader must define exactly one `@fragment` function. Creation can fail if passed an invalid
+    /// wgsl file, or if the specified path is invalid.
     pub fn new<'a, S: TryInto<wgpu::ShaderModuleDescriptor<'a>>>(
         shader: S,
     ) -> Result<Self, S::Error> {
@@ -38,7 +39,7 @@ impl ShaderCanvasState {
 
     /// Creates a new [`ShaderCanvasState`] instance with an entry point. This is necessary when your wgsl
     /// shader defines more than one `@fragment` function. In this case, the name of the function must be passed
-    /// in.
+    /// in.  Creation can fail if passed an invalid wgsl file, or if the specified path is invalid.
     pub fn new_with_entry_point<'a, S: TryInto<wgpu::ShaderModuleDescriptor<'a>>>(
         shader: S,
         entry_point: &'a str,
