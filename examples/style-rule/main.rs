@@ -6,7 +6,7 @@ pub fn main() -> std::io::Result<()> {
     const STYLE_RULE: tui_shader::StyleRule = tui_shader::StyleRule::Map(|sample| {
         let color = sample.color();
         let sum = sample.r() as u16 + sample.g() as u16 + sample.b() as u16;
-        if sum > 400 {
+        if sum > 300 {
             ratatui::style::Style::new()
                 .bg(color)
                 .fg(ratatui::style::Color::Black)

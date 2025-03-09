@@ -23,26 +23,40 @@ fn main() -> std::io::Result<()> {
                 Layout::horizontal([Constraint::Percentage(50), Constraint::Min(1)])
                     .areas(frame.area());
 
-            frame.render_widget(Block::bordered().title("Editor"), editor_area);
-            frame.render_widget(Block::bordered().title("Preview (F5 to reload)"), shader_area);
+            frame.render_widget(
+                Block::bordered().title(" Editor | <F5> Reload | <Esc> Quit "),
+                editor_area,
+            );
+            frame.render_widget(Block::bordered().title(" Preview "), shader_area);
             frame.render_widget(&textarea, editor_area.inner(Margin::new(1, 1)));
             if error_message.is_none() {
-                frame.render_stateful_widget(&canvas, shader_area.inner(Margin::new(1, 1)), &mut state);
+                frame.render_stateful_widget(
+                    &canvas,
+                    shader_area.inner(Margin::new(1, 1)),
+                    &mut state,
+                );
             } else {
-                frame.render_widget(Paragraph::new(error_message.clone().unwrap().as_str()).wrap(Wrap { trim: false }), shader_area.inner(Margin::new(1, 1)));
+                frame.render_widget(
+                    Paragraph::new(error_message.clone().unwrap().as_str())
+                        .wrap(Wrap { trim: false }),
+                    shader_area.inner(Margin::new(1, 1)),
+                );
             }
         })?;
 
         if let Ok(true) = crossterm::event::poll(std::time::Duration::from_millis(20)) {
             match crossterm::event::read()?.into() {
                 Input { key: Key::Esc, .. } => break,
-                Input { key: Key::F(5),.. }  => {
+                Input { key: Key::F(5), .. } => {
                     error_message = None;
-                    state = ShaderCanvasState::new(WgslShader::Source(textarea.lines().join("\n").as_str())).unwrap_or_else(|e| {
+                    state = ShaderCanvasState::new(WgslShader::Source(
+                        textarea.lines().join("\n").as_str(),
+                    ))
+                    .unwrap_or_else(|e| {
                         error_message = Some(e.to_string());
                         state
                     });
-                },
+                }
                 input => {
                     textarea.input(input);
                 }
