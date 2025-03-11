@@ -9,7 +9,7 @@
 // x = absolute x-position of rect
 // y = absolute y-position of rect
 // z = width of rect
-// w = height of height
+// w = height of rect
 @group(0) @binding(1) var<uniform> rect: vec4<f32>;
 
 // fragment shader entry point
@@ -18,9 +18,9 @@
 // of the current pixel being processed
 @fragment fn main(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     // here we do some math to generate r, g, and b channels
-    // trigonomitry functions are useful as they return values
+    // trigonometry functions are useful as they return values
     // between -1 and 1 which we can re-map with (+ 1.0 * 0.5)
-    // to be between 0 and 1.
+    // to the range 0 and 1.
     let r = sin(1.0 - uv.x + time.x) + 1.0 * 0.5;
     let g = cos(1.0 - uv.y + time.x) + 1.0 * 0.5;
     let b = 1.0 - r * g;
@@ -32,7 +32,7 @@
     // let's turn that around by subtracting from 1.0
     d = 1.0 - d;
 
-    // input our r, g, and b channels, with a constant alpha channel = 1.0
+    // input our r, g, and b channels, with a constant alpha channel of 1.0
     // and darken the pixel the further it is from the center
     // we can exaggerate the darkening effect by applying it twice (d²)
     return vec4<f32>(r, g, b, 1.0) * d * d;
