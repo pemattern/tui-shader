@@ -1,5 +1,3 @@
-use ratatui::style::Stylize;
-
 pub fn main() -> std::io::Result<()> {
     let mut terminal = ratatui::init();
     let mut fg_shader_state =

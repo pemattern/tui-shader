@@ -15,7 +15,7 @@ pub(crate) struct ShaderContext {
 }
 
 impl ShaderContext {
-    pub(crate) fn new(time: f32, rect: ratatui::layout::Rect) -> Self {
+    pub(crate) fn new(time: f32, rect: ratatui_core::layout::Rect) -> Self {
         Self {
             time: [time, time * 10.0, time.sin(), time.cos()],
             rect: [

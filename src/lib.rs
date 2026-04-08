@@ -115,7 +115,7 @@ pub use wgpu::include_wgsl;
 
 #[cfg(test)]
 mod tests {
-    use ratatui::{backend::TestBackend, layout::Position};
+    use ratatui_core::{backend::TestBackend, layout::Position};
 
     use crate::{CharacterRule, ShaderCanvas, ShaderCanvasState, context::ShaderContext};
 
@@ -139,7 +139,7 @@ mod tests {
 
     #[test]
     fn character_rule_map() {
-        let mut terminal = ratatui::Terminal::new(TestBackend::new(64, 64)).unwrap();
+        let mut terminal = ratatui_core::terminal::Terminal::new(TestBackend::new(64, 64)).unwrap();
         let mut state = ShaderCanvasState::default();
         terminal
             .draw(|frame| {
@@ -162,6 +162,5 @@ mod tests {
                 }
             })
             .unwrap();
-        ratatui::restore();
     }
 }

@@ -1,30 +1,17 @@
 [package]
 name = "tui-shader"
-authors = ["Paul Mattern <mail@paulmattern.dev>"]
-documentation = "https://docs.rs/tui-shader/latest/tui_shader/"
-version = "0.0.9"
+version = "0.0.10"
 edition = "2024"
-categories = ["graphics", "rendering", "gui"]
+rust-version = "1.86.0"
 description = "A ratatui widget that renders a fragment shader in the terminal"
+documentation = "https://docs.rs/tui-shader/latest/tui_shader/"
+readme = "README.md"
 homepage = "https://github.com/pemattern/tui-shader"
 repository = "https://github.com/pemattern/tui-shader"
-keywords = ["tui", "shader", "wgpu", "terminal", "graphics"]
 license = "MIT OR Apache-2.0"
-readme = "README.md"
-rust-version = "1.85.0"
-exclude = ["assets/", ".github/"]
-
-[dependencies]
-bytemuck = "1.21.0"
-flume = "0.11.1"
-pollster = "0.4.0"
-wgpu = "24.0.1"
-ratatui = "0.29.0"
-
-[dev-dependencies]
-rand = "0.9.0"
-tui-big-text = "0.7.1"
-tui-textarea = "0.7.0"
+keywords = ["graphics", "shader", "terminal", "tui", "wgpu"]
+categories = ["graphics", "gui", "rendering"]
+exclude = [".github/", "assets/"]
 
 [[example]]
 name = "shadertuiy"
@@ -57,3 +44,16 @@ path = "examples/tutorial/main.rs"
 [[example]]
 name = "stylize-other-widget"
 path = "examples/stylize-other-widget/main.rs"
+
+[dependencies]
+bytemuck = "1.22.0"
+flume = "0.11.1"
+pollster = "0.4.0"
+ratatui-core = "0.1.0"
+wgpu = "24.0.1"
+
+[dev-dependencies]
+rand = "0.9.0"
+ratatui = "0.30.0"
+tui-big-text = "0.8.4"
+tui-textarea-2 = "0.10.2"

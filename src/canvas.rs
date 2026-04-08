@@ -1,7 +1,7 @@
-use ratatui::buffer::Buffer;
-use ratatui::layout::{Position, Rect};
-use ratatui::style::{Color, Style};
-use ratatui::widgets::StatefulWidget;
+use ratatui_core::buffer::Buffer;
+use ratatui_core::layout::{Position, Rect};
+use ratatui_core::style::{Color, Style};
+use ratatui_core::widgets::StatefulWidget;
 
 use crate::context::ShaderContext;
 use crate::state::ShaderCanvasState;
@@ -23,7 +23,7 @@ use crate::{Sample, row_padding};
 /// }).unwrap();
 /// ratatui::restore();
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct ShaderCanvas {
     pub character_rule: CharacterRule,
     pub style_rule: StyleRule,

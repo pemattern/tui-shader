@@ -1,9 +1,9 @@
-use ratatui::style::{Color, Style};
+use ratatui_core::style::{Color, Style};
 
 use crate::Pixel;
 
 /// Determines which character to use for Cell.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum CharacterRule {
     /// [`CharacterRule::Always`] takes a single char and applies it to all cells.
     Always(char),
@@ -38,7 +38,7 @@ impl Default for CharacterRule {
 }
 
 /// Determines how to use the output of the fragment shader to style a Cell.
-#[derive(Debug, Default, Clone, Eq, PartialEq)]
+#[derive(Debug, Default, Clone)]
 pub enum StyleRule {
     /// [`StyleRule::ColorFg`] only applies the color from the shader to the foreground of the Cell.
     ColorFg,
