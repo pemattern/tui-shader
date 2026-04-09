@@ -2,7 +2,7 @@
 name = "tui-shader"
 version = "0.0.10"
 edition = "2024"
-rust-version = "1.86.0"
+rust-version = "1.88.0"
 description = "A ratatui widget that renders a fragment shader in the terminal"
 documentation = "https://docs.rs/tui-shader/latest/tui_shader/"
 readme = "README.md"
@@ -46,11 +46,11 @@ name = "stylize-other-widget"
 path = "examples/stylize-other-widget/main.rs"
 
 [dependencies]
-bytemuck = "1.22.0"
-flume = "0.11.1"
+bytemuck = "1.25.0"
+flume = "0.12.0"
 pollster = "0.4.0"
 ratatui-core = "0.1.0"
-wgpu = "24.0.1"
+wgpu = "27.0.1"
 
 [dev-dependencies]
 rand = "0.9.0"
